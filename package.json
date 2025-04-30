@@ -1,0 +1,41 @@
+{
+  "name": "zkfold-smart-wallet-api",
+  "version": "1.0.2",
+  "description": "Smart wallet api",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zkFold/smart-contract-wallet-api.git"
+  },
+  "keywords": [
+    "cardano",
+    "wallet"
+  ],
+  "author": "Vladimir Morozov",
+  "license": "BUSL-1.1",
+  "bugs": {
+    "url": "https://github.com/zkFold/smart-contract-wallet-api/issues"
+  },
+  "homepage": "https://github.com/zkFold/smart-contract-wallet-api#readme",
+  "devDependencies": {
+    "@eslint/js": "^9.25.1",
+    "@types/node": "^22.15.2",
+    "@types/nodemailer": "^6.4.17",
+    "eslint": "^9.25.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.31.0"
+  },
+  "dependencies": {
+    "@emurgo/cardano-serialization-lib-asmjs": "^14.1.1",
+    "@google-cloud/local-auth": "^2.1.0",
+    "@scure/bip39": "^1.5.0",
+    "axios": "^1.8.4",
+    "googleapis": "^105.0.0",
+    "nodemailer": "^6.10.0"
+  }
+}
