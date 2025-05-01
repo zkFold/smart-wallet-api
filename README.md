@@ -1,4 +1,4 @@
-# zkFold Smart Contract Wallet API 
+# zkFold Smart Wallet API
 
 This package provides a Smart Wallet API to manage both mnemonic-based and Google OAuth-based wallets.
 
@@ -13,7 +13,7 @@ Exported modules:
     * getUnusedAddresses(). Returns the list of unused addresses (normally there's only one address returned by getAddress() if does not have any transactions).
     * getRewardAddresses(). Currently returns an empty list.
     * getChangeAddress(). The same as getAddress().
-    * sendTo(rec: SmartTxRecipient). Send funds to an address or to Gmail. For example, the following will send 1 Ada to "test@zkfold.io": ```wallet.sendTo(new SmartTxRecipient(WalletType.Google, "test@zkfold.io", new BigIntWrap(1000000)))```
+    * sendTo(rec: SmartTxRecipient). Send funds to an address or to Gmail. For example, the following will send 1 Ada to "user@gmail.com": ```wallet.sendTo(new SmartTxRecipient(WalletType.Google, "user@gmail.com", new BigIntWrap(1000000)))```
 * [Backend.ts](src/Backend.ts). Provides high-level functions to backend REST API. Normally, you should only create an instance of Backend to pass it to the Wallet and not call its methods directly. 
 * [Notifier](src/Notifier.ts). Provides a Notifier object with methods to send email to funds recipients. 
 * [GoogleToken.ts](src/GoogleToken.ts). Provides methods to obtain Google JSON Web Tokens for gmail-based wallets.
@@ -30,7 +30,7 @@ import { Backend, BigIntWrap } from 'zkfold-smart-wallet-api'
 import { Notifier } from 'zkfold-smart-wallet-api'
 
 
-const backend = new Backend('https://backend.zkfold.io', 'api-key'); // To communicate with the backend
+const backend = new Backend('https://api.wallet.zkfold.io', 'api-key'); // To communicate with the backend
 const notifier = new Notifier("service@email.com", "application password"); // This will be used to send emails to the recipient
 
 const initialiser = { method: WalletType.Mnemonic, data: "mnemonic of the wallet ..." };
@@ -40,10 +40,10 @@ const address = await wallet.getAddress();
 console.log(address.to_bech32());
 const balance = await wallet.getBalance();
 console.log(balance);
-const txId = await wallet.sendTo(new SmartTxRecipient(WalletType.Google, "test@zkfold.io", new BigIntWrap(1000000)));
+const txId = await wallet.sendTo(new SmartTxRecipient(WalletType.Google, "user@gmail.com", new BigIntWrap(1000000)));
 console.log(txId);
 
-notifier.sendMessage("test@zkfold.io", "You've received funds", "html of the message body"); // Notify the recipient
+notifier.sendMessage("user@gmail.com", "You've received funds", "html of the message body"); // Notify the recipient
 ```
 
 ## Google OAuth-based
@@ -59,7 +59,7 @@ import { GoogleApi } from 'zkfold-smart-wallet-api'
 import CSL from '@emurgo/cardano-serialization-lib-nodejs';
 
 
-const backend = new Backend('https://backend.zkfold.io', 'api-key'); // To communicate with the backend
+const backend = new Backend('https://api.wallet.zkfold.io', 'api-key'); // To communicate with the backend
 const notifier = new Notifier("service@email.com", "application password"); // This will be used to send emails to the recipient
 const gapi = new GoogleApi("client id of your web app", "client secret", "redirect url");
 
@@ -80,8 +80,8 @@ const address = await wallet.getAddress();
 console.log(address.to_bech32());
 const balance = await wallet.getBalance();
 console.log(balance);
-const txId = await wallet.sendTo(new SmartTxRecipient(WalletType.Google, "test@zkfold.io", new BigIntWrap(1000000)));
+const txId = await wallet.sendTo(new SmartTxRecipient(WalletType.Google, "user@gmail.com", new BigIntWrap(1000000)));
 console.log(txId);
 
-notifier.sendMessage("test@zkfold.io", "You've received funds", "html of the message body"); // Notify the recipient
+notifier.sendMessage("user@gmail.com", "You've received funds", "html of the message body"); // Notify the recipient
 ```
