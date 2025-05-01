@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zkFold/smart-contract-wallet-api.git"
+    "url": "git+https://github.com/zkFold/smart-wallet-api.git"
   },
   "keywords": [
     "cardano",
@@ -18,9 +18,9 @@
   "author": "Vladimir Morozov",
   "license": "BUSL-1.1",
   "bugs": {
-    "url": "https://github.com/zkFold/smart-contract-wallet-api/issues"
+    "url": "https://github.com/zkFold/smart-wallet-api/issues"
   },
-  "homepage": "https://github.com/zkFold/smart-contract-wallet-api#readme",
+  "homepage": "https://github.com/zkFold/smart-wallet-api#readme",
   "devDependencies": {
     "@eslint/js": "^9.25.1",
     "@types/node": "^22.15.2",

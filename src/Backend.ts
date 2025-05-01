@@ -363,7 +363,7 @@ export class Backend {
     }
 
     /**
-     * Get all UTxO held by an address 
+     * Get all UTxOs held by an address 
      * @async
      * @param {CSL.Address} address
      * @returns {UTxO[]}

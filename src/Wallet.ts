@@ -213,7 +213,7 @@ export class Wallet {
 
     /**
      * @async
-     * Get UTxO held by the wallet 
+     * Get UTxOs held by the wallet 
      */
     async getUtxos(): Promise<UTxO[]> {
         const address = await this.getAddress();
