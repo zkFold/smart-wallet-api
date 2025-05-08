@@ -235,10 +235,16 @@ export class Backend {
     }
 
     private headers(additional = {}) {
-        if (this.secret) {
-            additional['api-key'] = this.secret;
+        if (additional == {}) {
+            return {}
         }
-        return additional;
+        const headers = {
+            headers: additional
+        }
+        if (this.secret) {
+            headers.headers['api-key'] = this.secret;
+        }
+        return headers;
     }
 
     /**
