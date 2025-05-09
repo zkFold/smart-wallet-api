@@ -83,6 +83,41 @@ export interface ProofBytes {
     "z2_xi'_int": BigIntWrap
 }
 
+export function parseProofBytes(json: string): ProofBytes {
+    const unsafe = JSON.parse(json);
+
+    const wrapped = {
+        "a_xi_int": new BigIntWrap(unsafe.a_xi_int), 
+        "b_xi_int": new BigIntWrap(unsafe.b_xi_int),
+        "c_xi_int": new BigIntWrap(unsafe.c_xi_int),
+        "cmA_bytes": unsafe.cmA_bytes,
+        "cmB_bytes": unsafe.cmB_bytes,
+        "cmC_bytes": unsafe.cmC_bytes,
+        "cmF_bytes": unsafe.cmF_bytes,
+        "cmH1_bytes": unsafe.cmH1_bytes,
+        "cmH2_bytes": unsafe.cmH2_bytes,
+        "cmQhigh_bytes": unsafe.cmQhigh_bytes,
+        "cmQlow_bytes": unsafe.cmQlow_bytes,
+        "cmQmid_bytes": unsafe.cmQmid_bytes,
+        "cmZ1_bytes": unsafe.cmZ1_bytes,
+        "cmZ2_bytes": unsafe.cmZ2_bytes,
+        "f_xi_int": new BigIntWrap(unsafe.f_xi_int),
+        "h1_xi'_int": new BigIntWrap(unsafe["h1_xi'_int"]),
+        "h2_xi_int": new BigIntWrap(unsafe.h2_xi_int),
+        "l1_xi": new BigIntWrap(unsafe.l1_xi),
+        "proof1_bytes": unsafe.proof1_bytes,
+        "proof2_bytes": unsafe.proof2_bytes,
+        "s1_xi_int": new BigIntWrap(unsafe.s1_xi_int),
+        "s2_xi_int": new BigIntWrap(unsafe.s2_xi_int),
+        "t_xi'_int": new BigIntWrap(unsafe["t_xi'_int"]),
+        "t_xi_int":  new BigIntWrap(unsafe.t_xi_int),
+        "z1_xi'_int": new BigIntWrap(unsafe["z1_xi'_int"]),
+        "z2_xi'_int": new BigIntWrap(unsafe["z2_xi'_int"])
+    };
+
+    return wrapped; 
+}
+
 /**
  * Transaction output as expected by the backend.
  *
@@ -192,11 +227,24 @@ export class Backend {
     /**
      * Creates a new Backend object.
      * @param {string} url     - Backend's URL
-     * @param {string} secret  - Backend's secret (API key)
+     * @param {string} secret  - optional Backend's secret (API key)
      */
-    constructor(url: string, secret: string) {
+    constructor(url: string, secret: string | null = null) {
         this.url = url;
         this.secret = secret;
+    }
+
+    private headers(additional = {}) {
+        if (additional == {}) {
+            return {}
+        }
+        const headers = {
+            headers: additional
+        }
+        if (this.secret) {
+            headers.headers['api-key'] = this.secret;
+        }
+        return headers;
     }
 
     /**
@@ -208,11 +256,7 @@ export class Backend {
     async walletAddress(email: string): Promise<CSL.Address> {
         const { data } = await axios.post(`${this.url}/v0/wallet/address`, {
             'email': email
-          }, {
-            headers: {
-              'api-key': this.secret
-            }
-          }
+          }, this.headers() 
         );
         return CSL.Address.from_bech32(data.address);
     }
@@ -227,11 +271,7 @@ export class Backend {
     async isWalletInitialised(email: string, pubKeyHash: string): Promise<boolean> {
         const { data } = await axios.post(`${this.url}/v0/wallet/is-initialized`, {
             'email': email
-          }, {
-            headers: {
-              'api-key': this.secret
-            }
-          }
+          }, this.headers() 
         );
         if (!data.is_initialized) {
             return false;
@@ -263,11 +303,7 @@ export class Backend {
             'payment_key_hash': payment_key_hash,
             'proof_bytes': proof_bytes,
             'fund_address': fund_address
-          }, {
-            headers: {
-              'api-key': this.secret
-            }
-          }
+          }, this.headers() 
         );
 
         const response: CreateWalletResponse = { 
@@ -298,11 +334,7 @@ export class Backend {
             'payment_key_hash': payment_key_hash,
             'proof_bytes': proof_bytes,
             'outs': outs,
-          }, {
-            headers: {
-              'api-key': this.secret
-            }
-          }
+          }, this.headers() 
         );
 
         const response: CreateWalletResponse = { 
@@ -328,11 +360,7 @@ export class Backend {
             'email': email,
             'outs': outs,
             'payment_key_hash': payment_key_hash,
-          }, {
-            headers: {
-              'api-key': this.secret
-            }
-          }
+          }, this.headers() 
         );
 
         const response: SendFundsResponse = { 
@@ -351,12 +379,8 @@ export class Backend {
      * @returns {string} - Transaction ID
      */
     async submitTx(tx: string): Promise<string> {
-        const { data } = await axios.post(`${this.url}/v0/tx/submit`, tx, {
-            headers: {
-              'api-key': this.secret,
-              "Content-Type": "application/json"
-            }
-          }
+        const { data } = await axios.post(`${this.url}/v0/tx/submit`, tx,
+            this.headers({ "Content-Type": "application/json" })
         );
         
         return data;
@@ -369,12 +393,7 @@ export class Backend {
      * @returns {UTxO[]}
      */
     async addressUtxo(address: CSL.Address): Promise<UTxO[]> {
-        const { data } = await axios.post(`${this.url}/v0/utxo/addresses`, [address.to_bech32()], {
-            headers: {
-              'api-key': this.secret
-            }
-          }
-        );
+        const { data } = await axios.post(`${this.url}/v0/utxo/addresses`, [address.to_bech32()], this.headers());
         
         const result: UTxO[] = [];
 
