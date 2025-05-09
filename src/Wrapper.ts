@@ -7,6 +7,8 @@ import { fileURLToPath } from 'url';
 import { parseProofBytes } from './Backend'
 
 export async function initialiseWASI() {
+    console.log(btoa(blake2b("asuhgvksjsklgvjhmslkdjh", null, 28)));
+    console.log(btoa(blake2b("asuhgsdjkhskndjfjlacksdfhcieurhgvfnierugvhlcseirhgoijeasiuhfcsdgcfsnlkcjfngfvljhrgblkjshfgcljghkljmvhfglvkjhsldkfjgvhsldjfghvmskjhgvlvksjsklgvjhmslkdjh", null, 28)));
     const wasi = new WASI({
         stdout: (out) => console.log("[wasm stdout]", out),
         blake2b: blake2b
@@ -38,6 +40,9 @@ export function mkProofBytesMock(instance, x, ps, empi) {
     const xStr = x.toString() + "\0";
     const psStr = ps.map((x) => x.toString()).join(" ") + "\0";
     const empiStr = [empi.e.toString(), empi.n.toString(), empi.sig.toString(), empi.tokenName.toString()].join(" ") + "\0";
+
+    console.log(empi);
+    console.log(empiStr);
 
     const xOffset = 0;
     const psOffset = xStr.length;

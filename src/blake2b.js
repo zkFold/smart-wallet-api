@@ -11,8 +11,12 @@ function  normalizeInput (input) {
   if (input instanceof Uint8Array) {
     ret = input
   } else if (typeof input === 'string') {
-    const encoder = new TextEncoder()
-    ret = encoder.encode(input)
+    const raw = input;
+    var bytes = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) {
+        bytes[i] = raw.charCodeAt(i);
+    }
+    ret = bytes; 
   } else {
     throw new Error(ERROR_MSG_INPUT)
   }
@@ -407,7 +411,8 @@ const decoder = new TextDecoder();
 // - personal - optional personal bytes, string, Buffer or Uint8Array
 export function blake2b (input, key, outlen, salt, personal) {
   // preprocess inputs
-  input = normalizeInput(input)
+  const c = input; 
+  input = normalizeInput(input);
 
   outlen = outlen || 64
 
@@ -424,6 +429,10 @@ export function blake2b (input, key, outlen, salt, personal) {
   let a = blake2bFinal(ctx)
 
   const str = a.reduce((acc, c) => acc + String.fromCharCode(c), '');
+
+  const b64encoded = btoa(String.fromCharCode.apply(null, input));
+  console.log(`NB: normalised input is ${b64encoded}`);
+  console.log(`h(${c}) = ${btoa(str)} `);
   return str
 }
 
