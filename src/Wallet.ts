@@ -390,6 +390,7 @@ export class Wallet {
                     txHex = resp.transaction;
                 } else {
                     const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex();
+                    console.log(pubkeyHex);
                     const parts = this.jwt.split(".");
                     const header  = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'));
                     const payload = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
@@ -401,7 +402,7 @@ export class Wallet {
                         e: b64ToBn(matchingKey.e.replace(/-/g, '+').replace(/_/g, '/')),
                         n: b64ToBn(matchingKey.n.replace(/-/g, '+').replace(/_/g, '/')),
                         sig: b64ToBn(signature),
-                        tokenName: BigInt('0x' + pubkeyHex)
+                        tokenName: BigInt("0x" + pubkeyHex)
                     };
 
                     const instance = await initialiseWASI();

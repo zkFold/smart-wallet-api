@@ -1,5 +1,6 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-asmjs/cardano_serialization_lib';
 import axios from 'axios';
+import JSONbig from 'json-bigint';
 
 /**
  * Wrapper for various integer types used in communication with the backend and CSL.
@@ -84,7 +85,8 @@ export interface ProofBytes {
 }
 
 export function parseProofBytes(json: string): ProofBytes {
-    const unsafe = JSON.parse(json);
+    const parser = JSONbig({ useNativeBigInt: true });
+    const unsafe = parser.parse(json);
 
     const wrapped = {
         "a_xi_int": new BigIntWrap(unsafe.a_xi_int), 
@@ -378,9 +380,10 @@ export class Backend {
      * @param {string} tx
      * @returns {string} - Transaction ID
      */
-    async submitTx(tx: string): Promise<string> {
-        const { data } = await axios.post(`${this.url}/v0/tx/submit`, tx,
-            this.headers({ "Content-Type": "application/json" })
+    async submitTx(tx: string, email_recipients: string[] = []): Promise<string> {
+        const { data } = await axios.post(`${this.url}/v0/tx/submit`, { email_recipients: email_recipients, tx: tx },
+            this.headers()
+            // this.headers({ "Content-Type": "application/json" })
         );
         
         return data;

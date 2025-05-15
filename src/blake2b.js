@@ -431,8 +431,6 @@ export function blake2b (input, key, outlen, salt, personal) {
   const str = a.reduce((acc, c) => acc + String.fromCharCode(c), '');
 
   const b64encoded = btoa(String.fromCharCode.apply(null, input));
-  console.log(`NB: normalised input is ${b64encoded}`);
-  console.log(`h(${c}) = ${btoa(str)} `);
   return str
 }
 
