@@ -1,7 +1,7 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-asmjs/cardano_serialization_lib';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { Backend, UTxO, ProofBytes, Output, BigIntWrap } from './Backend';
+import { Backend, UTxO, Output, BigIntWrap } from './Backend';
 import { initialiseWASI, mkProofBytesMock } from './Wrapper';
 
 /**
@@ -33,17 +33,17 @@ export interface Initialiser {
  * Describes the recipient of ADA
  * @property {WalletType} recipientType  - Type of wallet the recipient holds
  * @property {string} address            - Cardano address if recipientType is Mnemonic, email otherwise
- * @property {BigIntWrap} amount         - amount of lovelace to send
+ * @property {Asset} assets              - A dictionary of assets to send. For ADA, use 'lovelace' as the key. For other assets, use the format '<PolicyID>.<AssetName>'
  */
 export class SmartTxRecipient {
     recipientType: WalletType;
     address: string;
-    amount: BigIntWrap;
+    assets: Asset; 
 
-    constructor(recipientType: WalletType, address: string, amount: BigIntWrap) {
+    constructor(recipientType: WalletType, address: string, assets: Asset) {
         this.recipientType = recipientType;
         this.address = address;
-        this.amount = amount;
+        this.assets = assets;
     }
 }
 
@@ -282,7 +282,7 @@ export class Wallet {
      * @param {CSL.Address} recipientAddress - A Cardano address of the recipient
      * @param {CSL.Address} recipientAddress - A Cardano address of the recipient
      */
-    private async buildTx(senderAddress: CSL.Address, recipientAddress: CSL.Address, amountToSend: CSL.BigNum): Promise<CSL.TransactionBuilder> {
+    private async buildTx(senderAddress: CSL.Address, recipientAddress: CSL.Address, assets: Asset): Promise<CSL.TransactionBuilder> {
         const utxos = await this.getUtxos();
 
         const txBuilderCfg = 
@@ -327,12 +327,31 @@ export class Wallet {
         });
         txBuilder.set_inputs(txInputBuilder);
 
-        const output = CSL.TransactionOutput.new(
-                recipientAddress,
-                CSL.Value.new(amountToSend),
-        );
-
-        txBuilder.add_output(output);
+        for (const [key, value] of Object.entries(assets)) {
+            if (key == 'lovelace') {
+                const output = CSL.TransactionOutput.new(
+                        recipientAddress,
+                        CSL.Value.new(value.toBigNum()),
+                );
+                txBuilder.add_output(output);
+            } else {
+                const parts = key.split(".");
+                const policyId = parts[0];
+                const assetName = parts[1];
+                const assets = CSL.Assets.new();
+                assets.insert(
+                    CSL.AssetName.new(new TextEncoder().encode(assetName)),
+                    value.toBigNum(),
+                );
+                const masset = CSL.MultiAsset.new();
+                masset.insert(CSL.ScriptHash.from_hex(policyId), assets);
+                const output = CSL.TransactionOutput.new(
+                        recipientAddress,
+                        CSL.Value.new_with_assets(value.toBigNum(), masset),
+                );
+                txBuilder.add_output(output);
+            }
+        }
 
         txBuilder.add_change_if_needed(senderAddress);
         
@@ -349,7 +368,7 @@ export class Wallet {
         console.log(this.method);
         console.log(rec.recipientType);
         console.log(rec.address);
-        console.log(rec.amount);
+        console.log(rec.assets);
 
 
         const senderAddress = await this.getAddress();
@@ -361,12 +380,10 @@ export class Wallet {
             recipientAddress = CSL.Address.from_bech32(rec.address); 
         }
 
-        const amountToSend = rec.amount;
-
         switch (this.method) {
             case WalletType.Mnemonic: {
                 // A classical transaction from an address behind a private key to another address or a smart contract
-                const txBuilder = await this.buildTx(senderAddress, recipientAddress, amountToSend.toBigNum());
+                const txBuilder = await this.buildTx(senderAddress, recipientAddress, rec.assets);
 
                 const txBody = txBuilder.build(); 
 
@@ -383,7 +400,7 @@ export class Wallet {
                 console.log(`Is initialised: ${is_initialised}`);
                 let txHex;
 
-                const outs: Output[] = [{address: recipientAddress.to_bech32(), value: { 'lovelace': amountToSend }}];
+                const outs: Output[] = [{address: recipientAddress.to_bech32(), value: rec.assets}];
 
                 if (is_initialised && !this.freshKey) {
                     const resp = await this.backend.sendFunds(this.userId, outs, this.tokenSKey.to_public().to_raw_key().hash().to_hex());
@@ -437,7 +454,7 @@ function harden(num: number): number {
 
 async function getMatchingKey(keyId: string) {
     const { keys } = await fetch('https://www.googleapis.com/oauth2/v3/certs').then((res) => res.json());
-    for (let k of keys) {
+    for (const k of keys) {
         if (k.kid == keyId) {
                 return k;
         }
@@ -448,8 +465,8 @@ async function getMatchingKey(keyId: string) {
 
 // https://coolaj86.com/articles/bigints-and-base64-in-javascript/
 function b64ToBn(b64: string): bigint {
-    let bin = atob(b64);
-    let hex = [];
+    const bin = atob(b64);
+    const hex: string[] = [];
 
     bin.split('').forEach(function (ch) {
       let h = ch.charCodeAt(0).toString(16);
