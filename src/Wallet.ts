@@ -340,7 +340,7 @@ export class Wallet {
                 const assetName = parts[1];
                 const assets = CSL.Assets.new();
                 assets.insert(
-                    CSL.AssetName.new(new TextEncoder().encode(assetName)),
+                    CSL.AssetName.new(hexToBytes(assetName)),
                     value.toBigNum(),
                 );
                 const masset = CSL.MultiAsset.new();
