@@ -239,7 +239,7 @@ export class Backend {
     }
 
     private headers(additional = {}) {
-        if (additional == {}) {
+        if (Object.keys(additional).length === 0 && !this.secret) {
             return {}
         }
         const headers = {
