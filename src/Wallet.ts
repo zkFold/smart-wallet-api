@@ -416,14 +416,15 @@ export class Wallet {
                     const matchingKey = await getMatchingKey(keyId);
                     const signature = parts[2].replace(/-/g, '+').replace(/_/g, '/');
                     const empi = {
-                        e: b64ToBn(matchingKey.e.replace(/-/g, '+').replace(/_/g, '/')),
-                        n: b64ToBn(matchingKey.n.replace(/-/g, '+').replace(/_/g, '/')),
-                        sig: b64ToBn(signature),
-                        tokenName: BigInt("0x" + pubkeyHex)
+                        piPubE: b64ToBn(matchingKey.e.replace(/-/g, '+').replace(/_/g, '/')),
+                        piPubN: b64ToBn(matchingKey.n.replace(/-/g, '+').replace(/_/g, '/')),
+                        piSignature: b64ToBn(signature),
+                        piTokenName: new BigIntWrap("0x" + pubkeyHex)
                     };
 
-                    const instance = await initialiseWASI();
-                    const proofBytes = mkProofBytesMock(instance, 0n, new Array(19).fill(0n), empi);
+                    //const instance = await initialiseWASI();
+                    //const proofBytes = mkProofBytesMock(instance, 0n, new Array(19).fill(0n), empi);
+                    const proofBytes = await this.backend.prove(empi);
 
                     const resp = await this.backend.createAndSendFunds(this.userId, header + '.' + payload, pubkeyHex, proofBytes, outs);
                     txHex = resp.transaction;
@@ -464,7 +465,7 @@ async function getMatchingKey(keyId: string) {
 
 
 // https://coolaj86.com/articles/bigints-and-base64-in-javascript/
-function b64ToBn(b64: string): bigint {
+function b64ToBn(b64: string): BigIntWrap {
     const bin = atob(b64);
     const hex: string[] = [];
 
@@ -474,5 +475,5 @@ function b64ToBn(b64: string): bigint {
       hex.push(h);
     });
 
-    return BigInt('0x' + hex.join(''));
+    return new BigIntWrap(BigInt('0x' + hex.join('')));
 }
