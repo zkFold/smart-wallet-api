@@ -1,4 +1,4 @@
-import * as CSL from '@emurgo/cardano-serialization-lib-asmjs/cardano_serialization_lib';
+import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { Backend, UTxO, Output, BigIntWrap } from './Backend';
@@ -28,6 +28,32 @@ export interface Initialiser {
     data: string;
     rootKey?: string; 
 }
+
+/**
+ * Wallet configuration options for browser/extension compatibility
+ */
+export interface WalletOptions {
+    wasmUrl?: string; // Custom WASM URL for browser extensions
+}
+
+/**
+ * Browser-compatible buffer utilities
+ */
+const BufferUtils = {
+    from: (data: string | Uint8Array | ArrayBuffer, encoding?: string): Uint8Array => {
+        if (typeof data === 'string') {
+            if (encoding === 'hex') {
+                const bytes = [];
+                for (let i = 0; i < data.length; i += 2) {
+                    bytes.push(parseInt(data.substr(i, 2), 16));
+                }
+                return new Uint8Array(bytes);
+            }
+            return new TextEncoder().encode(data);
+        }
+        return new Uint8Array(data);
+    }
+};
 
 /**
  * Describes the recipient of ADA
@@ -71,23 +97,26 @@ export class Wallet {
     private backend: Backend; 
     private method: WalletType;
     private network: string;
+    private wasmUrl?: string;
 
     /**
      *  @param {Backend} backend         - A Backend object for communication with Cardano
      *  @param {Initialiser} initialiser - Data to initialise the wallet
      *  @param {string} password         - Optional password
      *  @param {string} network          - Accepted values: 'mainnet', 'preprod', 'preview'
+     *  @param {WalletOptions} options   - Browser/extension compatibility options
      */
-    constructor(backend: Backend, initialiser: Initialiser, password: string = '', network: string = 'mainnet') {
+    constructor(backend: Backend, initialiser: Initialiser, password: string = '', network: string = 'mainnet', options: WalletOptions = {}) {
         this.backend = backend;
         this.network = network;
         this.method = initialiser.method;
+        this.wasmUrl = options.wasmUrl;
         
         if (this.method == WalletType.Mnemonic) {
             const entropy = bip39.mnemonicToEntropy(initialiser.data, wordlist);
             this.rootKey = CSL.Bip32PrivateKey.from_bip39_entropy(
-                  Buffer.from(entropy, 'hex'),
-                  Buffer.from(password),
+                  BufferUtils.from(entropy, 'hex'),
+                  BufferUtils.from(password),
                 );
             this.deriveKeys();
         } else {
@@ -318,7 +347,7 @@ export class Wallet {
         utxos.forEach((utxo) => {
             if (utxo.value['lovelace'] != null) {
                 const ada = utxo.value['lovelace'];
-                const hash = CSL.TransactionHash.from_bytes(Buffer.from(utxo.ref.transaction_id, "hex"))
+                const hash = CSL.TransactionHash.from_bytes(BufferUtils.from(utxo.ref.transaction_id, "hex"))
                 const input = CSL.TransactionInput.new(hash, utxo.ref.output_index);
                 const value = CSL.Value.new(ada.toBigNum());
                 const addr = utxo.address;
@@ -390,7 +419,7 @@ export class Wallet {
                 const transaction = CSL.FixedTransaction.new_from_body_bytes(txBody.to_bytes());
                 transaction.sign_and_add_vkey_signature(this.accountKey.derive(0).derive(0).to_raw_key());
                 
-                const signedTxHex = Buffer.from(transaction.to_bytes()).toString('hex');
+                const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('');
                 return await this.backend.submitTx(signedTxHex);
             };
 
@@ -431,7 +460,7 @@ export class Wallet {
                 }
                 const transaction = CSL.FixedTransaction.from_bytes(hexToBytes(txHex));
                 transaction.sign_and_add_vkey_signature(this.tokenSKey.to_raw_key());
-                const signedTxHex = Buffer.from(transaction.to_bytes()).toString('hex');
+                const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('');
 
                 return await this.backend.submitTx(signedTxHex);
             };
