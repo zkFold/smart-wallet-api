@@ -1,87 +1,222 @@
-# zkFold Smart Wallet API
+# zkFold Smart Wallet API v1.3.0
 
-This package provides a Smart Wallet API to manage both mnemonic-based and Google OAuth-based wallets.
+🚀 **Browser & Extension Compatible** | 🔒 **Security Hardened** | 🌐 **Client-Side Ready**
 
-Exported modules:
-* [Wallet.ts](src/Wallet.ts). Provides methods to initiate wallets and send funds to other wallets, including via gmail. Wallet provides the following functions:
-    * addressForGmail(gmail: string). Returns a Cardano address for the given Gmail address.
-    * getAddress(). Returns Wallet's address.
-    * getBalance(). Returns Wallet's balance in format { token_name: amount }.
-    * getExtensions(). Returns the list of enabled extensions.
-    * getUtxos(). Returns the list of UTxO held by the wallet.
-    * getUsedAddresses(). Returns the list of used addresses (normally there's only one address returned by getAddress() if it has any transactions).
-    * getUnusedAddresses(). Returns the list of unused addresses (normally there's only one address returned by getAddress() if does not have any transactions).
-    * getRewardAddresses(). Currently returns an empty list.
-    * getChangeAddress(). The same as getAddress().
-    * sendTo(rec: SmartTxRecipient). Send funds to an address or to Gmail. For example, the following will send 1 Ada to "user@gmail.com": ```wallet.sendTo(new SmartTxRecipient(WalletType.Google, "user@gmail.com", new BigIntWrap(1000000)))```
-* [Backend.ts](src/Backend.ts). Provides high-level functions to backend REST API. Normally, you should only create an instance of Backend to pass it to the Wallet and not call its methods directly. 
-* [Notifier](src/Notifier.ts). Provides a Notifier object with methods to send email to funds recipients. 
-* [GoogleToken.ts](src/GoogleToken.ts). Provides methods to obtain Google JSON Web Tokens for gmail-based wallets.
+This package provides a Smart Wallet API to manage both mnemonic-based and Google OAuth-based wallets, now optimized for browser and extension usage with critical security improvements.
 
-# Example
+## 🚨 Breaking Changes in v1.3.0
 
-## Mnemonic-based
+### Security-Critical Changes
 
-A wallet can be created using a mnemonic. In this case, it will act as a classical wallet (i.e. create transactions signed with a private key), but it will still be able to send money to a gmail account.
-
+#### 1. Notifier Removed (Security Risk Eliminated)
 ```javascript
-import { Wallet, Initialiser, WalletType, SmartTxRecipient } from 'zkfold-smart-wallet-api';
-import { Backend, BigIntWrap } from 'zkfold-smart-wallet-api'
-import { Notifier } from 'zkfold-smart-wallet-api'
+// ❌ BEFORE (v1.2.x) - INSECURE
+import { Notifier } from 'zkfold-smart-wallet-api';
+const notifier = new Notifier("service@email.com", "password"); // Credential exposure!
 
-
-const backend = new Backend('https://api.wallet.zkfold.io', 'api-key'); // To communicate with the backend
-const notifier = new Notifier("service@email.com", "application password"); // This will be used to send emails to the recipient
-
-const initialiser = { method: WalletType.Mnemonic, data: "mnemonic of the wallet ..." };
-
-const wallet = new Wallet(backend, initialiser, 'password', 'preprod'); // A Wallet is created with Backend, wallet type parameters, optional password and network type.
-const address = await wallet.getAddress();
-console.log(address.to_bech32());
-const balance = await wallet.getBalance();
-console.log(balance);
-const txId = await wallet.sendTo(new SmartTxRecipient(WalletType.Google, "user@gmail.com", new BigIntWrap(1000000)));
-console.log(txId);
-
-notifier.sendMessage("user@gmail.com", "You've received funds", "html of the message body"); // Notify the recipient
+// ✅ AFTER (v1.3.x) - SECURE
+// Notifier completely removed - backend handles email notifications automatically
+// No more credential exposure or email abuse risk
 ```
 
-## Google OAuth-based
+#### 2. Google OAuth Now Uses PKCE (Client Secret Removed)
+```javascript
+// ❌ BEFORE (v1.2.x) - CLIENT SECRET EXPOSED
+import { GoogleApi } from 'zkfold-smart-wallet-api';
+const gapi = new GoogleApi("clientId", "clientSecret", "redirectURL"); // Secret exposed!
 
-A wallet can be created using Google OAuth. In this case, it will require a valid JSON Web Token signed by Google and intended to be used with the wallet [web application](https://console.cloud.google.com/welcome/new).
+// ✅ AFTER (v1.3.x) - PKCE SECURE
+import { GoogleApi } from 'zkfold-smart-wallet-api';
+const gapi = new GoogleApi("clientId", "redirectURL"); // No secrets needed - PKCE flow
+```
 
+#### 3. Browser-Compatible WASM Loading
+```javascript
+// ✅ NEW: Extension/Browser support with custom WASM URL
+const wallet = new Wallet(backend, initialiser, password, network, {
+    wasmUrl: chrome.runtime.getURL('assets/proof.wasm') // Extension compatibility
+});
+```
+
+## 📦 Installation
+
+```bash
+npm install zkfold-smart-wallet-api
+```
+
+## 🌟 Key Features
+
+- ✅ **Browser & Extension Compatible**: Works in Chrome, Firefox, Safari, Edge
+- ✅ **Security Hardened**: No credential exposure, PKCE OAuth, secure WASM loading  
+- ✅ **Multiple Build Formats**: ES modules, UMD, IIFE for different use cases
+- ✅ **TypeScript Support**: Full type definitions included
+
+## 📚 API Reference
+
+### Wallet
+Provides methods to initiate wallets and send funds securely:
+* **addressForGmail(gmail: string)**: Returns a Cardano address for the given Gmail address
+* **getAddress()**: Returns Wallet's address  
+* **getBalance()**: Returns Wallet's balance in format { token_name: amount }
+* **getExtensions()**: Returns the list of enabled extensions
+* **getUtxos()**: Returns the list of UTxO held by the wallet
+* **getUsedAddresses()**: Returns used addresses (normally one address if has transactions)
+* **getUnusedAddresses()**: Returns unused addresses (normally one address if no transactions)
+* **getRewardAddresses()**: Currently returns an empty list
+* **getChangeAddress()**: The same as getAddress()
+* **sendTo(rec: SmartTxRecipient)**: Send funds to an address or Gmail securely
+
+### Backend
+Provides high-level functions to backend REST API. Create an instance to pass to Wallet.
+
+### GoogleApi (PKCE Secure)
+**🔒 SECURITY UPGRADE**: Now uses PKCE flow - no client secrets needed!
+```javascript
+const gapi = new GoogleApi("your-client-id", "redirect-url"); // Secure PKCE flow
+const authUrl = await gapi.getAuthUrl("state");
+const jwt = await gapi.getJWT(authCode);
+```
+
+## 🔧 Usage Examples
+
+### Browser Extension Example
 
 ```javascript
-import { Wallet, Initialiser, WalletType, SmartTxRecipient } from 'zkfold-smart-wallet-api';
-import { Backend, BigIntWrap } from 'zkfold-smart-wallet-api'
-import { Notifier } from 'zkfold-smart-wallet-api'
-import { GoogleApi } from 'zkfold-smart-wallet-api'
-import CSL from '@emurgo/cardano-serialization-lib-nodejs';
+import { Wallet, Backend, GoogleApi, WalletType } from 'zkfold-smart-wallet-api';
 
+// Backend connection
+const backend = new Backend('https://api.wallet.zkfold.io', 'api-key');
 
-const backend = new Backend('https://api.wallet.zkfold.io', 'api-key'); // To communicate with the backend
-const notifier = new Notifier("service@email.com", "application password"); // This will be used to send emails to the recipient
-const gapi = new GoogleApi("client id of your web app", "client secret", "redirect url");
+// Secure PKCE OAuth (no client secret!)
+const gapi = new GoogleApi("client-id", "redirect-url");
+const authUrl = await gapi.getAuthUrl("state");
+// ... OAuth flow ...
+const jwt = await gapi.getJWT(authCode);
 
+// Extension-compatible wallet
+const wallet = new Wallet(backend, 
+    { method: WalletType.Google, data: jwt },
+    '', 'mainnet',
+    { wasmUrl: chrome.runtime.getURL('assets/proof.wasm') }
+);
 
-const prvKey = CSL.Bip32PrivateKey.generate_ed25519_bip32(); // Will be used to mint a token and sign transactions
-const state = crypto.randomBytes(32).toString('hex'); // Google requires to use state to avoid CSRF attacks
-const authUrl = gapi.getAuthUrl(state); // User should be redirecred here to obtain a JSON Web Token
-
-// After a successful authentication, Google will send a request to the specified endpoint.
-// The request will contain a url parameter 'code' which should be passed to getJWT()
-
-const jwt = await gapi.getJWT(response.code);
-
-const initialiser = { method: WalletType.Google, data: jwt, rootKey: prvKey };
-
-const wallet = new Wallet(backend, initialiser, 'password', 'preprod'); // The Wallet can be used exactly as before, there's nothing new from a user's perspective 
-const address = await wallet.getAddress();
-console.log(address.to_bech32());
+// Use wallet
 const balance = await wallet.getBalance();
-console.log(balance);
-const txId = await wallet.sendTo(new SmartTxRecipient(WalletType.Google, "user@gmail.com", new BigIntWrap(1000000)));
-console.log(txId);
-
-notifier.sendMessage("user@gmail.com", "You've received funds", "html of the message body"); // Notify the recipient
+await wallet.sendTo({
+    recipientType: WalletType.Google,
+    address: "user@gmail.com",
+    assets: { lovelace: new BigIntWrap(1000000) }
+});
 ```
+
+### Mnemonic-Based Wallet
+
+A wallet can be created using a mnemonic for classical wallet functionality:
+
+```javascript
+import { Wallet, Backend, WalletType, SmartTxRecipient, BigIntWrap } from 'zkfold-smart-wallet-api';
+
+const backend = new Backend('https://api.wallet.zkfold.io', 'api-key');
+
+// Mnemonic wallet
+const wallet = new Wallet(
+    backend,
+    { 
+        method: WalletType.Mnemonic, 
+        data: "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" 
+    },
+    'password', // optional
+    'mainnet'
+);
+
+// Send 1 ADA to Gmail user  
+await wallet.sendTo(new SmartTxRecipient(
+    WalletType.Google, 
+    "user@gmail.com", 
+    { lovelace: new BigIntWrap(1000000) }
+```
+
+### Google OAuth-Based Wallet (Secure PKCE)
+
+Create a wallet using Google OAuth with the new secure PKCE flow:
+
+```javascript
+import { Wallet, Backend, GoogleApi, WalletType } from 'zkfold-smart-wallet-api';
+
+const backend = new Backend('https://api.wallet.zkfold.io', 'api-key');
+
+// Secure PKCE OAuth (no client secret needed!)
+const gapi = new GoogleApi(
+    "your-google-client-id.apps.googleusercontent.com", 
+    "https://your-app.com/oauth/callback"
+);
+
+// Generate auth URL and redirect user
+const state = crypto.randomUUID(); // CSRF protection
+const authUrl = await gapi.getAuthUrl(state);
+// Redirect user to authUrl...
+
+// After OAuth callback with authorization code
+const jwt = await gapi.getJWT(authorizationCode);
+
+// Create wallet
+const wallet = new Wallet(
+    backend,
+    { method: WalletType.Google, data: jwt },
+    '', // password optional
+    'mainnet'
+);
+
+// Use wallet normally
+const address = await wallet.getAddress();
+const balance = await wallet.getBalance();
+
+// Send funds
+await wallet.sendTo(new SmartTxRecipient(
+    WalletType.Google, 
+    "recipient@gmail.com",
+    { lovelace: new BigIntWrap(2000000) } // 2 ADA
+));
+```
+
+## 🔗 Browser Extension Integration
+
+See [BROWSER_EXTENSION_EXAMPLE.md](BROWSER_EXTENSION_EXAMPLE.md) for complete extension implementation.
+
+## 🔄 Migration Guide
+
+### From v1.2.x to v1.3.x
+
+```javascript
+// ❌ OLD (v1.2.x) - Security risks
+import { Notifier, GoogleApi } from 'zkfold-smart-wallet-api';
+const notifier = new Notifier("email", "pass"); // Credential exposure
+const gapi = new GoogleApi("id", "secret", "url"); // Client secret exposed
+
+// ✅ NEW (v1.3.x) - Secure
+import { GoogleApi } from 'zkfold-smart-wallet-api';
+// Notifier removed - backend handles notifications
+const gapi = new GoogleApi("id", "url"); // PKCE - no secrets
+```
+
+## 📋 Requirements
+
+- **Browser**: Chrome 88+, Firefox 78+, Safari 14+, Edge 88+
+- **Node.js**: 16+ (for development)
+- **Extensions**: Manifest V3 supported
+
+## 🔒 Security Features
+
+- ✅ **PKCE OAuth Flow**: Eliminates client secret exposure
+- ✅ **No Email Credentials**: Backend handles notifications server-side  
+- ✅ **Secure WASM Loading**: Browser-compatible with extension support
+- ✅ **Web Crypto API**: Uses browser-native cryptographic functions
+- ✅ **Type Safety**: Full TypeScript support with proper declarations
+
+## 📄 License
+
+BUSL-1.1
+
+---
+
+**⚠️ Important**: This version contains breaking changes for security. Review the migration guide before upgrading.
