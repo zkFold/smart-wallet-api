@@ -27,11 +27,12 @@ Provides methods to initiate wallets and send funds securely:
 Provides high-level functions to backend REST API. Create an instance to pass to Wallet.
 
 ### GoogleApi
-Provides PKCE OAuth authentication for Google-based wallets:
+Provides implicit OAuth authentication for Google-based wallets (client-side compatible):
 ```javascript
 const gapi = new GoogleApi("your-client-id", "redirect-url");
 const authUrl = await gapi.getAuthUrl("state");
-const jwt = await gapi.getJWT(authCode);
+// User redirected to Google, then back with JWT in URL fragment
+const jwt = gapi.getJWTFromFragment(window.location.hash);
 ```
 
 ## Usage Examples
@@ -78,8 +79,8 @@ const state = crypto.randomUUID();
 const authUrl = await gapi.getAuthUrl(state);
 // Redirect user to authUrl...
 
-// After OAuth callback with authorization code
-const jwt = await gapi.getJWT(authorizationCode);
+// After OAuth callback, extract JWT from URL fragment
+const jwt = gapi.getJWTFromFragment(window.location.hash);
 
 // Create wallet
 const wallet = new Wallet(
