@@ -1,8 +1,9 @@
-import * as CSL from '@emurgo/cardano-serialization-lib-asmjs/cardano_serialization_lib';
+import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { Backend, UTxO, Output, BigIntWrap } from './Backend';
-import { initialiseWASI, mkProofBytesMock } from './Wrapper';
+import { initialiseWASI, mkProofBytesMock } from './WASM';
+import { BufferUtils, hexToBytes } from './Utils';
 
 /**
  * Whether the wallet was initialised with a mnemonic or with Gmail.
@@ -26,7 +27,14 @@ export enum WalletType {
 export interface Initialiser {
     method: WalletType;
     data: string;
-    rootKey?: string; 
+    rootKey?: string;
+}
+
+/**
+ * Wallet configuration options for browser/extension compatibility
+ */
+export interface WalletOptions {
+    wasmUrl?: string; // Custom WASM URL for browser extensions
 }
 
 /**
@@ -38,7 +46,7 @@ export interface Initialiser {
 export class SmartTxRecipient {
     recipientType: WalletType;
     address: string;
-    assets: Asset; 
+    assets: Asset;
 
     constructor(recipientType: WalletType, address: string, assets: Asset) {
         this.recipientType = recipientType;
@@ -68,31 +76,34 @@ export class Wallet {
     private userId!: string;     // Only for Google 
     private freshKey: boolean = false;
 
-    private backend: Backend; 
+    private backend: Backend;
     private method: WalletType;
     private network: string;
+    private wasmUrl?: string;
 
     /**
      *  @param {Backend} backend         - A Backend object for communication with Cardano
      *  @param {Initialiser} initialiser - Data to initialise the wallet
      *  @param {string} password         - Optional password
      *  @param {string} network          - Accepted values: 'mainnet', 'preprod', 'preview'
+     *  @param {WalletOptions} options   - Browser/extension compatibility options
      */
-    constructor(backend: Backend, initialiser: Initialiser, password: string = '', network: string = 'mainnet') {
+    constructor(backend: Backend, initialiser: Initialiser, password: string = '', network: string = 'mainnet', options: WalletOptions = {}) {
         this.backend = backend;
         this.network = network;
         this.method = initialiser.method;
-        
+        this.wasmUrl = options.wasmUrl;
+
         if (this.method == WalletType.Mnemonic) {
             const entropy = bip39.mnemonicToEntropy(initialiser.data, wordlist);
             this.rootKey = CSL.Bip32PrivateKey.from_bip39_entropy(
-                  Buffer.from(entropy, 'hex'),
-                  Buffer.from(password),
-                );
+                BufferUtils.from(entropy, 'hex'),
+                BufferUtils.from(password),
+            );
             this.deriveKeys();
         } else {
             // At this point, we assume that userId is a valid email accessible by the user (i.e. the user was able to complete Google authentication).
-            this.jwt = initialiser.data; 
+            this.jwt = initialiser.data;
 
             const parts = this.jwt.split(".");
             const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
@@ -100,12 +111,12 @@ export class Wallet {
 
             if (!initialiser.rootKey) {
                 const prvKey = CSL.Bip32PrivateKey
-                      .generate_ed25519_bip32()
-                      .derive(harden(1852)) // purpose
-                      .derive(harden(1815)) // coin type
-                      .derive(harden(0)) // account #0
-                      .derive(0)
-                      .derive(0);
+                    .generate_ed25519_bip32()
+                    .derive(harden(1852)) // purpose
+                    .derive(harden(1815)) // coin type
+                    .derive(harden(0)) // account #0
+                    .derive(0)
+                    .derive(0);
                 this.tokenSKey = prvKey;
                 this.freshKey = true;
             } else {
@@ -124,19 +135,19 @@ export class Wallet {
             return;
         }
         this.accountKey = this.rootKey
-          .derive(harden(1852)) // purpose
-          .derive(harden(1815)) // coin type
-          .derive(harden(0)); // account #0
-        
+            .derive(harden(1852)) // purpose
+            .derive(harden(1815)) // coin type
+            .derive(harden(0)); // account #0
+
         this.utxoPubKey = this.accountKey
-          .derive(0) // external
-          .derive(0)
-          .to_public();
-        
+            .derive(0) // external
+            .derive(0)
+            .to_public();
+
         this.stakeKey = this.accountKey
-          .derive(2) // chimeric
-          .derive(0)
-          .to_public();
+            .derive(2) // chimeric
+            .derive(0)
+            .to_public();
     }
 
     /**
@@ -155,7 +166,7 @@ export class Wallet {
     async getAddress(): Promise<CSL.Address> {
         switch (this.method) {
             case WalletType.Mnemonic: {
-                const paymentCred = CSL.Credential.from_keyhash(this.utxoPubKey.to_raw_key().hash()); 
+                const paymentCred = CSL.Credential.from_keyhash(this.utxoPubKey.to_raw_key().hash());
                 let netId: number = 0;
                 switch (this.network) {
                     case "mainnet": {
@@ -175,14 +186,14 @@ export class Wallet {
                 // This is required when initialising the wallet with email
                 // I'll create an Enterprise address instead for now.
                 const baseAddr = CSL.EnterpriseAddress.new(
-                  netId,
-                  paymentCred,
+                    netId,
+                    paymentCred,
                 );
-                
+
                 return baseAddr.to_address()
             };
             case WalletType.Google: {
-                return await this.addressForGmail(this.userId);  
+                return await this.addressForGmail(this.userId);
             };
         }
     }
@@ -194,7 +205,7 @@ export class Wallet {
     async getBalance(): Promise<Asset> {
         const utxos = await this.getUtxos();
         const assets: Asset = {};
-        for (let i=0; i < utxos.length; i++) {
+        for (let i = 0; i < utxos.length; i++) {
             for (const key in utxos[i].value) {
                 if (!(key in assets)) {
                     assets[key] = new BigIntWrap(0);
@@ -220,7 +231,7 @@ export class Wallet {
         const address = await this.getAddress();
         let utxos: UTxO[] = [];
         try {
-            utxos = await this.backend.addressUtxo(address); 
+            utxos = await this.backend.addressUtxo(address);
         } catch (err) {
             console.log("getUtxos()");
             console.log(err);
@@ -242,7 +253,7 @@ export class Wallet {
             return [address];
         }
     }
-    
+
     /**
      * @async
      * Get wallet's unused addresses 
@@ -285,32 +296,32 @@ export class Wallet {
     private async buildTx(senderAddress: CSL.Address, recipientAddress: CSL.Address, assets: Asset): Promise<CSL.TransactionBuilder> {
         const utxos = await this.getUtxos();
 
-        const txBuilderCfg = 
+        const txBuilderCfg =
             CSL.TransactionBuilderConfigBuilder.new()
-            .fee_algo(
-                CSL.LinearFee.new(
-                CSL.BigNum.from_str("44"),
-                CSL.BigNum.from_str("155381")
-            )
-            )
-            .coins_per_utxo_byte(CSL.BigNum.from_str("4310"))
-            .pool_deposit(CSL.BigNum.from_str("500000000"))
-            .key_deposit(CSL.BigNum.from_str("2000000"))
-            .max_value_size(5000)
-            .max_tx_size(16384)
-            .prefer_pure_change(true)
-            .ex_unit_prices(CSL.ExUnitPrices.new(
-               CSL.UnitInterval.new(
-                 CSL.BigNum.from_str("577"),
-                 CSL.BigNum.from_str("10000")
-               ),
-               CSL.UnitInterval.new(
-                 CSL.BigNum.from_str("721"),
-                 CSL.BigNum.from_str("10000000")
-               )
-             ))
-            .build();
-        
+                .fee_algo(
+                    CSL.LinearFee.new(
+                        CSL.BigNum.from_str("44"),
+                        CSL.BigNum.from_str("155381")
+                    )
+                )
+                .coins_per_utxo_byte(CSL.BigNum.from_str("4310"))
+                .pool_deposit(CSL.BigNum.from_str("500000000"))
+                .key_deposit(CSL.BigNum.from_str("2000000"))
+                .max_value_size(5000)
+                .max_tx_size(16384)
+                .prefer_pure_change(true)
+                .ex_unit_prices(CSL.ExUnitPrices.new(
+                    CSL.UnitInterval.new(
+                        CSL.BigNum.from_str("577"),
+                        CSL.BigNum.from_str("10000")
+                    ),
+                    CSL.UnitInterval.new(
+                        CSL.BigNum.from_str("721"),
+                        CSL.BigNum.from_str("10000000")
+                    )
+                ))
+                .build();
+
         const txBuilder = CSL.TransactionBuilder.new(txBuilderCfg);
 
         const txInputBuilder = CSL.TxInputsBuilder.new();
@@ -318,7 +329,7 @@ export class Wallet {
         utxos.forEach((utxo) => {
             if (utxo.value['lovelace'] != null) {
                 const ada = utxo.value['lovelace'];
-                const hash = CSL.TransactionHash.from_bytes(Buffer.from(utxo.ref.transaction_id, "hex"))
+                const hash = CSL.TransactionHash.from_bytes(BufferUtils.from(utxo.ref.transaction_id, "hex"))
                 const input = CSL.TransactionInput.new(hash, utxo.ref.output_index);
                 const value = CSL.Value.new(ada.toBigNum());
                 const addr = utxo.address;
@@ -330,8 +341,8 @@ export class Wallet {
         for (const [key, value] of Object.entries(assets)) {
             if (key == 'lovelace') {
                 const output = CSL.TransactionOutput.new(
-                        recipientAddress,
-                        CSL.Value.new(value.toBigNum()),
+                    recipientAddress,
+                    CSL.Value.new(value.toBigNum()),
                 );
                 txBuilder.add_output(output);
             } else {
@@ -346,15 +357,15 @@ export class Wallet {
                 const masset = CSL.MultiAsset.new();
                 masset.insert(CSL.ScriptHash.from_hex(policyId), assets);
                 const output = CSL.TransactionOutput.new(
-                        recipientAddress,
-                        CSL.Value.new_with_assets(value.toBigNum(), masset),
+                    recipientAddress,
+                    CSL.Value.new_with_assets(value.toBigNum(), masset),
                 );
                 txBuilder.add_output(output);
             }
         }
 
         txBuilder.add_change_if_needed(senderAddress);
-        
+
         return txBuilder;
     }
 
@@ -377,7 +388,7 @@ export class Wallet {
         if (rec.recipientType == WalletType.Google) {
             recipientAddress = await this.addressForGmail(rec.address);
         } else {
-            recipientAddress = CSL.Address.from_bech32(rec.address); 
+            recipientAddress = CSL.Address.from_bech32(rec.address);
         }
 
         switch (this.method) {
@@ -385,12 +396,12 @@ export class Wallet {
                 // A classical transaction from an address behind a private key to another address or a smart contract
                 const txBuilder = await this.buildTx(senderAddress, recipientAddress, rec.assets);
 
-                const txBody = txBuilder.build(); 
+                const txBody = txBuilder.build();
 
                 const transaction = CSL.FixedTransaction.new_from_body_bytes(txBody.to_bytes());
                 transaction.sign_and_add_vkey_signature(this.accountKey.derive(0).derive(0).to_raw_key());
-                
-                const signedTxHex = Buffer.from(transaction.to_bytes()).toString('hex');
+
+                const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('');
                 return await this.backend.submitTx(signedTxHex);
             };
 
@@ -400,7 +411,7 @@ export class Wallet {
                 console.log(`Is initialised: ${is_initialised}`);
                 let txHex;
 
-                const outs: Output[] = [{address: recipientAddress.to_bech32(), value: rec.assets}];
+                const outs: Output[] = [{ address: recipientAddress.to_bech32(), value: rec.assets }];
 
                 if (is_initialised && !this.freshKey) {
                     const resp = await this.backend.sendFunds(this.userId, outs, this.tokenSKey.to_public().to_raw_key().hash().to_hex());
@@ -409,7 +420,7 @@ export class Wallet {
                     const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex();
                     console.log(pubkeyHex);
                     const parts = this.jwt.split(".");
-                    const header  = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'));
+                    const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'));
                     const payload = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
 
                     const keyId = JSON.parse(header).kid;
@@ -431,7 +442,7 @@ export class Wallet {
                 }
                 const transaction = CSL.FixedTransaction.from_bytes(hexToBytes(txHex));
                 transaction.sign_and_add_vkey_signature(this.tokenSKey.to_raw_key());
-                const signedTxHex = Buffer.from(transaction.to_bytes()).toString('hex');
+                const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('');
 
                 return await this.backend.submitTx(signedTxHex);
             };
@@ -440,24 +451,15 @@ export class Wallet {
 
 }
 
-// Convert a hex string to a byte array
-// https://stackoverflow.com/questions/14603205/how-to-convert-hex-string-into-a-bytes-array-and-a-bytes-array-in-the-hex-strin
-function hexToBytes(hex: string): Uint8Array {
-    const bytes = [];
-    for (let c = 0; c < hex.length; c += 2)
-        bytes.push(parseInt(hex.substr(c, 2), 16));
-    return Uint8Array.from(bytes);
-}
-
 function harden(num: number): number {
-  return 0x80000000 + num;
+    return 0x80000000 + num;
 }
 
 async function getMatchingKey(keyId: string) {
     const { keys } = await fetch('https://www.googleapis.com/oauth2/v3/certs').then((res) => res.json());
     for (const k of keys) {
         if (k.kid == keyId) {
-                return k;
+            return k;
         }
     }
     return null;
@@ -470,9 +472,9 @@ function b64ToBn(b64: string): BigIntWrap {
     const hex: string[] = [];
 
     bin.split('').forEach(function (ch) {
-      let h = ch.charCodeAt(0).toString(16);
-      if (h.length % 2) { h = '0' + h; }
-      hex.push(h);
+        let h = ch.charCodeAt(0).toString(16);
+        if (h.length % 2) { h = '0' + h; }
+        hex.push(h);
     });
 
     return new BigIntWrap(BigInt('0x' + hex.join('')));

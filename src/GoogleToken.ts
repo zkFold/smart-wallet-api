@@ -1,51 +1,81 @@
-import {google} from 'googleapis';
-
 export class GoogleApi {
-    private oauth2Client: any;
+    private clientId: string;
+    private redirectURL: string;
+    private codeVerifier: string = '';
 
-    constructor(clientId: string, clientSecret: string, redirectURL: string) {
-        /**
-         * To use OAuth2 authentication, we need access to a CLIENT_ID, CLIENT_SECRET, AND REDIRECT_URI
-         * from the client_secret.json file. To get these credentials for your application, visit
-         * https://console.cloud.google.com/apis/credentials.
-         */
-        this.oauth2Client = new google.auth.OAuth2(
-          clientId, 
-          clientSecret, 
-          redirectURL 
-        );
-            
+    constructor(clientId: string, redirectURL: string) {
+        // PKCE OAuth2 - RFC 7636
+        this.clientId = clientId;
+        this.redirectURL = redirectURL;
     }
 
-    getAuthUrl(state: string): Promise<string> {
-        // Example access scopes for zkLogin: user email and public profile info are used.
-        const scopes = [
-          'https://www.googleapis.com/auth/userinfo.email',
-          'openid',
-        ];
+    private generateCodeVerifier(): string {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return this.base64URLEncode(array);
+    }
 
-        const authorizationUrl = this.oauth2Client.generateAuthUrl({
-          // 'online' (default) or 'offline' (gets refresh_token)
-          access_type: 'offline',
-          /** Pass in the scopes array defined above.
-            * Alternatively, if only one scope is needed, you can pass a scope URL as a string */
-          scope: scopes,
-          // Enable incremental authorization. Recommended as a best practice.
-          include_granted_scopes: true,
-          // Include the state parameter to reduce the risk of CSRF attacks.
-          state: state
+    private base64URLEncode(buffer: Uint8Array): string {
+        const base64 = btoa(String.fromCharCode(...buffer));
+        return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    private async sha256(plain: string): Promise<ArrayBuffer> {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(plain);
+        return await crypto.subtle.digest('SHA-256', data);
+    }
+
+    private async generateCodeChallenge(): Promise<string> {
+        const hashed = await this.sha256(this.codeVerifier);
+        return this.base64URLEncode(new Uint8Array(hashed));
+    }
+
+    async getAuthUrl(state: string): Promise<string> {
+        this.codeVerifier = this.generateCodeVerifier();
+        const codeChallenge = await this.generateCodeChallenge();
+
+        const params = new URLSearchParams({
+            client_id: this.clientId,
+            redirect_uri: this.redirectURL,
+            response_type: 'code',
+            scope: 'https://www.googleapis.com/auth/userinfo.email openid',
+            state: state,
+            code_challenge: codeChallenge,
+            code_challenge_method: 'S256',
+            access_type: 'offline',
+            include_granted_scopes: 'true'
         });
-        return authorizationUrl;
-    };
+
+        return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    }
 
     async getJWT(code: string): Promise<string | undefined> {
         try {
-            const { tokens } = await this.oauth2Client.getToken(code);
-            console.info('Tokens acquired.');
-            this.oauth2Client.setCredentials(tokens);
+            const response = await fetch('https://oauth2.googleapis.com/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    client_id: this.clientId,
+                    code: code,
+                    code_verifier: this.codeVerifier,
+                    grant_type: 'authorization_code',
+                    redirect_uri: this.redirectURL,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Token exchange failed: ${response.statusText}`);
+            }
+
+            const tokens = await response.json();
+            console.info('Tokens acquired via PKCE.');
             return tokens.id_token;
         } catch (e) {
-            console.log(e);
+            console.error('PKCE token exchange error:', e);
+            return undefined;
         }
     }
 }

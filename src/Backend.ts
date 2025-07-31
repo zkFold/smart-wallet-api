@@ -1,7 +1,7 @@
-import * as CSL from '@emurgo/cardano-serialization-lib-asmjs/cardano_serialization_lib';
+import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import axios from 'axios';
 import JSONbig from 'json-bigint';
-import forge from 'node-forge';
+import { bytesToHex, bigIntToBytes, bytesToBase64Url } from './Utils';
 
 /**
  * Wrapper for various integer types used in communication with the backend and CSL.
@@ -46,8 +46,8 @@ export class BigIntWrap {
         return CSL.BigNum.from_str(this.int.toString());
     }
 
-    toJSON(): JSON {
-        return JSON.rawJSON(this.int.toString()); 
+    toJSON(): string {
+        return this.int.toString(); 
     }
 }
 
@@ -86,7 +86,9 @@ export interface ProofBytes {
     "z2_xi'_int": BigIntWrap
 }
 
-export function parseProofBytes(json: string): ProofBytes {
+export type ProofStatus = ProofBytes;
+
+export function parseProofBytes(json: string): ProofBytes | null {
     console.log(json);
     let unsafe;
     if (typeof json === 'string') {
@@ -240,7 +242,7 @@ export interface BackendKey {
     pkbPublic: PublicKey
 }
 
-export function parseBackendKeys(json: string): BackendKey[] {
+export function parseBackendKeys(json: any[]): BackendKey[] {
     const result = [];
     const arrayLength = json.length;
     for (let i = 0; i < arrayLength; i++) {
@@ -261,7 +263,7 @@ export function parseProofStatus(json: string): ProofBytes | string {
     const parser = JSONbig({ useNativeBigInt: true });
     const unsafe = parser.parse(json);
     if (unsafe.tag == "Completed") {
-        return parseProofBytes(unsafe.contents.presBytes);
+        return parseProofBytes(unsafe.contents.presBytes) || "";
     }
     return unsafe.tag;
     
@@ -280,7 +282,7 @@ export interface ProofInput {
  */
 export class Backend {
     private url: string;
-    private secret: string;
+    private secret: string | null;
 
     /**
      * Creates a new Backend object.
@@ -292,11 +294,11 @@ export class Backend {
         this.secret = secret;
     }
 
-    private headers(additional = {}) {
+    private headers(additional: Record<string, string> = {}) {
         if (Object.keys(additional).length === 0 && !this.secret) {
             return {}
         }
-        const headers = {
+        const headers: Record<string, any> = {
             headers: additional
         }
         if (this.secret) {
@@ -492,6 +494,7 @@ export class Backend {
         return parseBackendKeys(data);
     }
 
+
     /**
      * Submit a proof request to the Backend. It will return a Request ID which can be used to retrieve proof status
      * @async
@@ -506,37 +509,73 @@ export class Backend {
 
         const payload = JSON.stringify(proofInput);
 
-        // 1. Generate AES-256 key and IV
-        const aesKey = forge.random.getBytesSync(32); // 256 bits
-        const iv = forge.random.getBytesSync(16);     // 128-bit IV for AES-CBC
+        // 1. Generate AES-256 key and IV using Web Crypto API
+        const aesKey = crypto.getRandomValues(new Uint8Array(32)); // 256 bits
+        const iv = crypto.getRandomValues(new Uint8Array(16));     // 128-bit IV for AES-CBC
 
         // 2. AES encrypt the plaintext with AES-256-CBC and PKCS#7 padding
-        const cipher = forge.cipher.createCipher('AES-CBC', aesKey);
-        cipher.start({ iv: iv });
-        cipher.update(forge.util.createBuffer(payload));
-        cipher.finish();
-        const encryptedData = cipher.output.getBytes(); // Encrypted payload
+        const cryptoKey = await crypto.subtle.importKey(
+            'raw',
+            aesKey,
+            { name: 'AES-CBC' },
+            false,
+            ['encrypt']
+        );
+
+        const payloadBytes = new TextEncoder().encode(payload);
+        const encryptedData = await crypto.subtle.encrypt(
+            { name: 'AES-CBC', iv: iv },
+            cryptoKey,
+            payloadBytes
+        );
 
         // 3. Prepend IV to the ciphertext
-        const ivPlusCipher = iv + encryptedData;
+        const ivPlusCipher = new Uint8Array(iv.length + encryptedData.byteLength);
+        ivPlusCipher.set(iv, 0);
+        ivPlusCipher.set(new Uint8Array(encryptedData), iv.length);
 
-        const n = new forge.jsbn.BigInteger(key.pkbPublic.public_n.toString(), 10);
-        const e = new forge.jsbn.BigInteger(key.pkbPublic.public_e.toString(), 10);
-        const publicKey = forge.pki.setRsaPublicKey(n, e);
+        // 4. Import RSA public key and encrypt AES key
+        // Note: Using RSA-OAEP instead of PKCS#1 v1.5 for browser compatibility
+        const nBigInt = BigInt(key.pkbPublic.public_n.toString());
+        const eBigInt = BigInt(key.pkbPublic.public_e.toString());
+        
+        // Convert BigInts to byte arrays for RSA key
+        const nBytes = bigIntToBytes(nBigInt);
+        const eBytes = bigIntToBytes(eBigInt);
 
-        // 5. Encrypt AES key using RSA PKCS#1 v1.5
-        const encryptedKey = publicKey.encrypt(aesKey, 'RSAES-PKCS1-V1_5');
+        const publicKey = await crypto.subtle.importKey(
+            'jwk',
+            {
+                kty: 'RSA',
+                n: bytesToBase64Url(nBytes),
+                e: bytesToBase64Url(eBytes),
+                alg: 'RSA-OAEP-256',
+                use: 'enc'
+            },
+            { name: 'RSA-OAEP', hash: 'SHA-256' },
+            false,
+            ['encrypt']
+        );
+
+        // 5. Encrypt AES key using RSA-OAEP (browser-compatible alternative to PKCS#1 v1.5)
+        const encryptedKey = await crypto.subtle.encrypt(
+            { name: 'RSA-OAEP' },
+            publicKey,
+            aesKey
+        );
 
         const proveRequest = {
             preqKeyId: key.pkbId,
-            preqAES: forge.util.bytesToHex(encryptedKey),
-            preqPayload: forge.util.bytesToHex(ivPlusCipher)
+            preqAES: bytesToHex(new Uint8Array(encryptedKey)),
+            preqPayload: bytesToHex(ivPlusCipher)
         };
 
         const { data } = await axios.post(`${this.url}/v0/wallet/prove`, proveRequest, this.headers());
 
         return data;
     }
+
+
 
     /**
      * Retrieve the status of a Proof Request 
@@ -559,7 +598,7 @@ export class Backend {
      * @returns {ProofBytes} ZK proof bytes for the expMod circuit 
      */
     async prove(proofInput: ProofInput): Promise<ProofBytes> {
-        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
         const proofId = await this.requestProof(proofInput);
 
         while (true) {
@@ -576,7 +615,7 @@ export class Backend {
 
             } catch (error) {
                 console.error('Error checking status:', error);
-                return null;
+                return null as any;
             }
         }
 
