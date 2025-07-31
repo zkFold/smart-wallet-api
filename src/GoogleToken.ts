@@ -1,15 +1,15 @@
 export class GoogleApi {
     private clientId: string;
     private redirectURL: string;
-    private codeVerifier: string = '';
+    private nonce: string = '';
 
     constructor(clientId: string, redirectURL: string) {
-        // PKCE OAuth2 - RFC 7636
+        // Implicit OAuth2 Flow for client-side applications
         this.clientId = clientId;
         this.redirectURL = redirectURL;
     }
 
-    private generateCodeVerifier(): string {
+    private generateNonce(): string {
         const array = new Uint8Array(32);
         crypto.getRandomValues(array);
         return this.base64URLEncode(array);
@@ -20,61 +20,52 @@ export class GoogleApi {
         return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     }
 
-    private async sha256(plain: string): Promise<ArrayBuffer> {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(plain);
-        return await crypto.subtle.digest('SHA-256', data);
-    }
-
-    private async generateCodeChallenge(): Promise<string> {
-        const hashed = await this.sha256(this.codeVerifier);
-        return this.base64URLEncode(new Uint8Array(hashed));
-    }
-
     async getAuthUrl(state: string): Promise<string> {
-        this.codeVerifier = this.generateCodeVerifier();
-        const codeChallenge = await this.generateCodeChallenge();
+        this.nonce = this.generateNonce();
 
         const params = new URLSearchParams({
             client_id: this.clientId,
             redirect_uri: this.redirectURL,
-            response_type: 'code',
+            response_type: 'id_token',
             scope: 'https://www.googleapis.com/auth/userinfo.email openid',
             state: state,
-            code_challenge: codeChallenge,
-            code_challenge_method: 'S256',
-            access_type: 'offline',
+            nonce: this.nonce,
             include_granted_scopes: 'true'
         });
 
         return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
     }
 
-    async getJWT(code: string): Promise<string | undefined> {
+    getJWTFromFragment(urlFragment: string): string | undefined {
         try {
-            const response = await fetch('https://oauth2.googleapis.com/token', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    client_id: this.clientId,
-                    code: code,
-                    code_verifier: this.codeVerifier,
-                    grant_type: 'authorization_code',
-                    redirect_uri: this.redirectURL,
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`Token exchange failed: ${response.statusText}`);
+            // Parse the URL fragment that comes after the # in the redirect URL
+            // Example: #id_token=eyJ...&state=xyz&token_type=Bearer&expires_in=3600
+            const params = new URLSearchParams(urlFragment.startsWith('#') ? urlFragment.slice(1) : urlFragment);
+            const idToken = params.get('id_token');
+            
+            if (!idToken) {
+                console.error('No id_token found in URL fragment');
+                return undefined;
             }
 
-            const tokens = await response.json();
-            console.info('Tokens acquired via PKCE.');
-            return tokens.id_token;
+            // Verify the nonce in the JWT matches what we sent
+            const parts = idToken.split(".");
+            if (parts.length !== 3) {
+                console.error('Invalid JWT format');
+                return undefined;
+            }
+
+            const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+            
+            if (payload.nonce !== this.nonce) {
+                console.error('Nonce mismatch in JWT');
+                return undefined;
+            }
+
+            console.info('JWT acquired via implicit flow.');
+            return idToken;
         } catch (e) {
-            console.error('PKCE token exchange error:', e);
+            console.error('Error parsing JWT from URL fragment:', e);
             return undefined;
         }
     }
