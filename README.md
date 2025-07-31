@@ -29,10 +29,10 @@ Provides high-level functions to backend REST API. Create an instance to pass to
 ### GoogleApi
 Provides implicit OAuth authentication for Google-based wallets (client-side compatible):
 ```javascript
-const gapi = new GoogleApi("your-client-id", "redirect-url");
-const authUrl = await gapi.getAuthUrl("state");
-// User redirected to Google, then back with JWT in URL fragment
-const jwt = gapi.getJWT(window.location.hash);
+const gapi = new GoogleApi("your-client-id", "your-client-secret", "redirect-url");
+const authUrl = gapi.getAuthUrl("state");
+// User redirected to Google, then back with code in URL parameters
+const jwt = await gapi.getJWT(code);
 ```
 
 ## Usage Examples
@@ -71,16 +71,19 @@ const backend = new Backend('https://api.wallet.zkfold.io', 'api-key');
 
 const gapi = new GoogleApi(
     "your-google-client-id.apps.googleusercontent.com", 
+    "your-google-client-secret",
     "https://your-app.com/oauth/callback"
 );
 
 // Generate auth URL and redirect user
 const state = crypto.randomUUID();
-const authUrl = await gapi.getAuthUrl(state);
+const authUrl = gapi.getAuthUrl(state);
 // Redirect user to authUrl...
 
-// After OAuth callback, extract JWT from URL fragment
-const jwt = gapi.getJWT(window.location.hash);
+// After OAuth callback, extract code from URL parameters and exchange for JWT
+const urlParams = new URLSearchParams(window.location.search);
+const code = urlParams.get('code');
+const jwt = await gapi.getJWT(code);
 
 // Create wallet
 const wallet = new Wallet(
