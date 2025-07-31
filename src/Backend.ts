@@ -1,6 +1,7 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import axios from 'axios';
 import JSONbig from 'json-bigint';
+import { bytesToHex, bigIntToBytes, bytesToBase64Url } from './Utils';
 
 /**
  * Wrapper for various integer types used in communication with the backend and CSL.
@@ -493,14 +494,6 @@ export class Backend {
         return parseBackendKeys(data);
     }
 
-    /**
-     * Browser-compatible crypto utilities
-     */
-    private browserCrypto = {
-        bytesToHex(bytes: Uint8Array): string {
-            return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-    };
 
     /**
      * Submit a proof request to the Backend. It will return a Request ID which can be used to retrieve proof status
@@ -547,15 +540,15 @@ export class Backend {
         const eBigInt = BigInt(key.pkbPublic.public_e.toString());
         
         // Convert BigInts to byte arrays for RSA key
-        const nBytes = this.bigIntToBytes(nBigInt);
-        const eBytes = this.bigIntToBytes(eBigInt);
+        const nBytes = bigIntToBytes(nBigInt);
+        const eBytes = bigIntToBytes(eBigInt);
 
         const publicKey = await crypto.subtle.importKey(
             'jwk',
             {
                 kty: 'RSA',
-                n: this.bytesToBase64Url(nBytes),
-                e: this.bytesToBase64Url(eBytes),
+                n: bytesToBase64Url(nBytes),
+                e: bytesToBase64Url(eBytes),
                 alg: 'RSA-OAEP-256',
                 use: 'enc'
             },
@@ -573,8 +566,8 @@ export class Backend {
 
         const proveRequest = {
             preqKeyId: key.pkbId,
-            preqAES: this.browserCrypto.bytesToHex(new Uint8Array(encryptedKey)),
-            preqPayload: this.browserCrypto.bytesToHex(ivPlusCipher)
+            preqAES: bytesToHex(new Uint8Array(encryptedKey)),
+            preqPayload: bytesToHex(ivPlusCipher)
         };
 
         const { data } = await axios.post(`${this.url}/v0/wallet/prove`, proveRequest, this.headers());
@@ -582,20 +575,7 @@ export class Backend {
         return data;
     }
 
-    private bigIntToBytes(bigInt: bigint): Uint8Array {
-        const hex = bigInt.toString(16);
-        const paddedHex = hex.length % 2 ? '0' + hex : hex;
-        const bytes = new Uint8Array(paddedHex.length / 2);
-        for (let i = 0; i < paddedHex.length; i += 2) {
-            bytes[i / 2] = parseInt(paddedHex.substr(i, 2), 16);
-        }
-        return bytes;
-    }
 
-    private bytesToBase64Url(bytes: Uint8Array): string {
-        const base64 = btoa(String.fromCharCode(...bytes));
-        return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-    }
 
     /**
      * Retrieve the status of a Proof Request 
