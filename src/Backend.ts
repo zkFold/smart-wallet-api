@@ -503,16 +503,98 @@ export class Backend {
     };
 
     /**
-     * Submit a proof request to the Backend (browser-compatible version)
-     * The complex RSA/AES encryption has been simplified - backend should handle encryption server-side
+     * Submit a proof request to the Backend. It will return a Request ID which can be used to retrieve proof status
      * @async
      * @param {ProofInput} inputs for the expMod circuit: exponent, modulus, signature and token name
      * @returns {string} proof request ID
      */
     async requestProof(proofInput: ProofInput): Promise<string> {
-        // Simplified for browser compatibility - send proof input directly
-        const { data } = await axios.post(`${this.url}/v0/wallet/prove`, proofInput, this.headers());
+        const keys = await this.serverKeys();
+
+        //TODO: choose the freshest one if we end up implementing key rotation
+        const key = keys[0];
+
+        const payload = JSON.stringify(proofInput);
+
+        // 1. Generate AES-256 key and IV using Web Crypto API
+        const aesKey = crypto.getRandomValues(new Uint8Array(32)); // 256 bits
+        const iv = crypto.getRandomValues(new Uint8Array(16));     // 128-bit IV for AES-CBC
+
+        // 2. AES encrypt the plaintext with AES-256-CBC and PKCS#7 padding
+        const cryptoKey = await crypto.subtle.importKey(
+            'raw',
+            aesKey,
+            { name: 'AES-CBC' },
+            false,
+            ['encrypt']
+        );
+
+        const payloadBytes = new TextEncoder().encode(payload);
+        const encryptedData = await crypto.subtle.encrypt(
+            { name: 'AES-CBC', iv: iv },
+            cryptoKey,
+            payloadBytes
+        );
+
+        // 3. Prepend IV to the ciphertext
+        const ivPlusCipher = new Uint8Array(iv.length + encryptedData.byteLength);
+        ivPlusCipher.set(iv, 0);
+        ivPlusCipher.set(new Uint8Array(encryptedData), iv.length);
+
+        // 4. Import RSA public key and encrypt AES key
+        // Note: Using RSA-OAEP instead of PKCS#1 v1.5 for browser compatibility
+        const nBigInt = BigInt(key.pkbPublic.public_n.toString());
+        const eBigInt = BigInt(key.pkbPublic.public_e.toString());
+        
+        // Convert BigInts to byte arrays for RSA key
+        const nBytes = this.bigIntToBytes(nBigInt);
+        const eBytes = this.bigIntToBytes(eBigInt);
+
+        const publicKey = await crypto.subtle.importKey(
+            'jwk',
+            {
+                kty: 'RSA',
+                n: this.bytesToBase64Url(nBytes),
+                e: this.bytesToBase64Url(eBytes),
+                alg: 'RSA-OAEP-256',
+                use: 'enc'
+            },
+            { name: 'RSA-OAEP', hash: 'SHA-256' },
+            false,
+            ['encrypt']
+        );
+
+        // 5. Encrypt AES key using RSA-OAEP (browser-compatible alternative to PKCS#1 v1.5)
+        const encryptedKey = await crypto.subtle.encrypt(
+            { name: 'RSA-OAEP' },
+            publicKey,
+            aesKey
+        );
+
+        const proveRequest = {
+            preqKeyId: key.pkbId,
+            preqAES: this.browserCrypto.bytesToHex(new Uint8Array(encryptedKey)),
+            preqPayload: this.browserCrypto.bytesToHex(ivPlusCipher)
+        };
+
+        const { data } = await axios.post(`${this.url}/v0/wallet/prove`, proveRequest, this.headers());
+
         return data;
+    }
+
+    private bigIntToBytes(bigInt: bigint): Uint8Array {
+        const hex = bigInt.toString(16);
+        const paddedHex = hex.length % 2 ? '0' + hex : hex;
+        const bytes = new Uint8Array(paddedHex.length / 2);
+        for (let i = 0; i < paddedHex.length; i += 2) {
+            bytes[i / 2] = parseInt(paddedHex.substr(i, 2), 16);
+        }
+        return bytes;
+    }
+
+    private bytesToBase64Url(bytes: Uint8Array): string {
+        const base64 = btoa(String.fromCharCode(...bytes));
+        return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     }
 
     /**

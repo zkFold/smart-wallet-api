@@ -1,18 +1,10 @@
-/**
- * Google OAuth API using PKCE (Proof Key for Code Exchange) for secure client-side authentication
- * No client secret required - safe for browser and extension use
- */
 export class GoogleApi {
     private clientId: string;
     private redirectURL: string;
     private codeVerifier: string = '';
 
     constructor(clientId: string, redirectURL: string) {
-        /**
-         * PKCE OAuth2 implementation - secure for public clients
-         * No client secret needed, eliminating security risk
-         * https://tools.ietf.org/html/rfc7636
-         */
+        // PKCE OAuth2 - RFC 7636
         this.clientId = clientId;
         this.redirectURL = redirectURL;
     }

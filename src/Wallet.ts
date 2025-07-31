@@ -3,6 +3,7 @@ import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { Backend, UTxO, Output, BigIntWrap } from './Backend';
 import { initialiseWASI, mkProofBytesMock } from './Wrapper';
+import { BufferUtils } from './utils';
 
 /**
  * Whether the wallet was initialised with a mnemonic or with Gmail.
@@ -35,25 +36,6 @@ export interface Initialiser {
 export interface WalletOptions {
     wasmUrl?: string; // Custom WASM URL for browser extensions
 }
-
-/**
- * Browser-compatible buffer utilities
- */
-const BufferUtils = {
-    from: (data: string | Uint8Array | ArrayBuffer, encoding?: string): Uint8Array => {
-        if (typeof data === 'string') {
-            if (encoding === 'hex') {
-                const bytes = [];
-                for (let i = 0; i < data.length; i += 2) {
-                    bytes.push(parseInt(data.substr(i, 2), 16));
-                }
-                return new Uint8Array(bytes);
-            }
-            return new TextEncoder().encode(data);
-        }
-        return new Uint8Array(data);
-    }
-};
 
 /**
  * Describes the recipient of ADA
