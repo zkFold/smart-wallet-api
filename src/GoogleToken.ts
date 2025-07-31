@@ -36,13 +36,13 @@ export class GoogleApi {
         return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
     }
 
-    getJWTFromFragment(urlFragment: string): string | undefined {
+    getJWT(urlFragment: string): string | undefined {
         try {
             // Parse the URL fragment that comes after the # in the redirect URL
             // Example: #id_token=eyJ...&state=xyz&token_type=Bearer&expires_in=3600
             const params = new URLSearchParams(urlFragment.startsWith('#') ? urlFragment.slice(1) : urlFragment);
             const idToken = params.get('id_token');
-            
+
             if (!idToken) {
                 console.error('No id_token found in URL fragment');
                 return undefined;
@@ -56,7 +56,7 @@ export class GoogleApi {
             }
 
             const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-            
+
             if (payload.nonce !== this.nonce) {
                 console.error('Nonce mismatch in JWT');
                 return undefined;

@@ -32,7 +32,7 @@ Provides implicit OAuth authentication for Google-based wallets (client-side com
 const gapi = new GoogleApi("your-client-id", "redirect-url");
 const authUrl = await gapi.getAuthUrl("state");
 // User redirected to Google, then back with JWT in URL fragment
-const jwt = gapi.getJWTFromFragment(window.location.hash);
+const jwt = gapi.getJWT(window.location.hash);
 ```
 
 ## Usage Examples
@@ -80,7 +80,7 @@ const authUrl = await gapi.getAuthUrl(state);
 // Redirect user to authUrl...
 
 // After OAuth callback, extract JWT from URL fragment
-const jwt = gapi.getJWTFromFragment(window.location.hash);
+const jwt = gapi.getJWT(window.location.hash);
 
 // Create wallet
 const wallet = new Wallet(
