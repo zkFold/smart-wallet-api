@@ -8,6 +8,7 @@
   "type": "module",
   "files": [
     "dist",
+    "wasm-bindings",
     "src/proof.wasm"
   ],
   "scripts": {

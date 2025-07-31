@@ -1,6 +1,6 @@
-import { WASI } from "./wasi.js";
-import ghc_wasm_jsffi from "./ghc_wasm_jsffi.js";
-import { blake2b } from "./blake2b.js";
+import { WASI } from "../wasm-bindings/wasi.js";
+import ghc_wasm_jsffi from "../wasm-bindings/ghc_wasm_jsffi.js";
+import { blake2b } from "../wasm-bindings/blake2b.js";
 import { parseProofBytes } from './Backend';
 
 /**
@@ -10,7 +10,7 @@ import { parseProofBytes } from './Backend';
 export class BrowserWasmLoader {
     async loadWasm(wasmUrl?: string): Promise<WebAssembly.Instance> {
         let wasmBytes: ArrayBuffer;
-        
+
         if (wasmUrl) {
             // Custom WASM URL provided (useful for extensions)
             const response = await fetch(wasmUrl);
@@ -42,14 +42,14 @@ export class BrowserWasmLoader {
             )
         );
         Object.assign(jsffiExports, wasm_bin.instance.exports);
-        
+
         wasi.initialize(wasm_bin, {
             ghc_wasm_jsffi: ghc_wasm_jsffi(jsffiExports),
             blake2b: blake2b
         });
 
         (wasm_bin.instance.exports as any).hs_init(0, 0);
-        
+
         return wasm_bin.instance;
     }
 }
@@ -76,10 +76,10 @@ export function mkProofBytesMock(instance: WebAssembly.Instance, x: bigint, ps: 
     const xBuf = new Uint8Array(exports.memory.buffer, xOffset, xStr.length);
     const psBuf = new Uint8Array(exports.memory.buffer, psOffset, psStr.length);
     const empiBuf = new Uint8Array(exports.memory.buffer, empiOffset, empiStr.length);
-    
-    xBuf.forEach((v,i,a) => a[i] = xStr.charCodeAt(i));
-    psBuf.forEach((v,i,a) => a[i] = psStr.charCodeAt(i));
-    empiBuf.forEach((v,i,a) => a[i] = empiStr.charCodeAt(i));
+
+    xBuf.forEach((v, i, a) => a[i] = xStr.charCodeAt(i));
+    psBuf.forEach((v, i, a) => a[i] = psStr.charCodeAt(i));
+    empiBuf.forEach((v, i, a) => a[i] = empiStr.charCodeAt(i));
 
     const address = exports.mkProofBytesMockWasm(xBuf.byteOffset, psBuf.byteOffset, empiBuf.byteOffset);
 
