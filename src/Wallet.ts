@@ -3,7 +3,7 @@ import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { Backend, UTxO, Output, BigIntWrap } from './Backend';
 import { initialiseWASI, mkProofBytesMock } from './Wrapper';
-import { BufferUtils } from './utils';
+import { BufferUtils, hexToBytes } from './Utils';
 
 /**
  * Whether the wallet was initialised with a mnemonic or with Gmail.
@@ -449,15 +449,6 @@ export class Wallet {
         };
     }
 
-}
-
-// Convert a hex string to a byte array
-// https://stackoverflow.com/questions/14603205/how-to-convert-hex-string-into-a-bytes-array-and-a-bytes-array-in-the-hex-strin
-function hexToBytes(hex: string): Uint8Array {
-    const bytes = [];
-    for (let c = 0; c < hex.length; c += 2)
-        bytes.push(parseInt(hex.substr(c, 2), 16));
-    return Uint8Array.from(bytes);
 }
 
 function harden(num: number): number {
