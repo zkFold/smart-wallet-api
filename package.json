@@ -1,6 +1,6 @@
 {
   "name": "zkfold-smart-wallet-api",
-  "version": "1.3.3",
+  "version": "1.3.6",
   "description": "Smart wallet api - Browser and extension compatible",
   "main": "dist/smart-wallet-api.es.js",
   "module": "dist/smart-wallet-api.es.js",
@@ -35,6 +35,7 @@
     "@eslint/js": "^9.25.1",
     "@types/json-bigint": "^1.0.4",
     "@types/node": "^22.15.2",
+    "@types/node-forge": "^1.3.13",
     "@types/nodemailer": "^6.4.17",
     "@vitejs/plugin-legacy": "^7.1.0",
     "eslint": "^9.25.1",
@@ -51,6 +52,7 @@
     "@emurgo/cardano-serialization-lib-browser": "^14.1.1",
     "@scure/bip39": "^1.5.0",
     "axios": "^1.8.4",
-    "json-bigint": "^1.0.0"
+    "json-bigint": "^1.0.0",
+    "node-forge": "^1.3.1"
   }
 }
