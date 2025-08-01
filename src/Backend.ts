@@ -1,7 +1,7 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import axios from 'axios';
 import JSONbig from 'json-bigint';
-import { bytesToHex, bigIntToBytes, bytesToBase64Url } from './Utils';
+import forge from 'node-forge';
 
 /**
  * Wrapper for various integer types used in communication with the backend and CSL.
@@ -509,65 +509,31 @@ export class Backend {
 
         const payload = JSON.stringify(proofInput);
 
-        // 1. Generate AES-256 key and IV using Web Crypto API
-        const aesKey = crypto.getRandomValues(new Uint8Array(32)); // 256 bits
-        const iv = crypto.getRandomValues(new Uint8Array(16));     // 128-bit IV for AES-CBC
+        // 1. Generate AES-256 key and IV
+        const aesKey = forge.random.getBytesSync(32); // 256 bits
+        const iv = forge.random.getBytesSync(16);     // 128-bit IV for AES-CBC
 
         // 2. AES encrypt the plaintext with AES-256-CBC and PKCS#7 padding
-        const cryptoKey = await crypto.subtle.importKey(
-            'raw',
-            aesKey,
-            { name: 'AES-CBC' },
-            false,
-            ['encrypt']
-        );
-
-        const payloadBytes = new TextEncoder().encode(payload);
-        const encryptedData = await crypto.subtle.encrypt(
-            { name: 'AES-CBC', iv: iv },
-            cryptoKey,
-            payloadBytes
-        );
+        const cipher = forge.cipher.createCipher('AES-CBC', aesKey);
+        cipher.start({ iv: iv });
+        cipher.update(forge.util.createBuffer(payload));
+        cipher.finish();
+        const encryptedData = cipher.output.getBytes(); // Encrypted payload
 
         // 3. Prepend IV to the ciphertext
-        const ivPlusCipher = new Uint8Array(iv.length + encryptedData.byteLength);
-        ivPlusCipher.set(iv, 0);
-        ivPlusCipher.set(new Uint8Array(encryptedData), iv.length);
+        const ivPlusCipher = iv + encryptedData;
 
-        // 4. Import RSA public key and encrypt AES key
-        // Note: Using RSA-OAEP instead of PKCS#1 v1.5 for browser compatibility
-        const nBigInt = BigInt(key.pkbPublic.public_n.toString());
-        const eBigInt = BigInt(key.pkbPublic.public_e.toString());
-        
-        // Convert BigInts to byte arrays for RSA key
-        const nBytes = bigIntToBytes(nBigInt);
-        const eBytes = bigIntToBytes(eBigInt);
+        const n = new forge.jsbn.BigInteger(key.pkbPublic.public_n.toString(), 10);
+        const e = new forge.jsbn.BigInteger(key.pkbPublic.public_e.toString(), 10);
+        const publicKey = forge.pki.setRsaPublicKey(n, e);
 
-        const publicKey = await crypto.subtle.importKey(
-            'jwk',
-            {
-                kty: 'RSA',
-                n: bytesToBase64Url(nBytes),
-                e: bytesToBase64Url(eBytes),
-                alg: 'RSA-OAEP-256',
-                use: 'enc'
-            },
-            { name: 'RSA-OAEP', hash: 'SHA-256' },
-            false,
-            ['encrypt']
-        );
-
-        // 5. Encrypt AES key using RSA-OAEP (browser-compatible alternative to PKCS#1 v1.5)
-        const encryptedKey = await crypto.subtle.encrypt(
-            { name: 'RSA-OAEP' },
-            publicKey,
-            aesKey
-        );
+        // 5. Encrypt AES key using RSA PKCS#1 v1.5
+        const encryptedKey = publicKey.encrypt(aesKey, 'RSAES-PKCS1-V1_5');
 
         const proveRequest = {
             preqKeyId: key.pkbId,
-            preqAES: bytesToHex(new Uint8Array(encryptedKey)),
-            preqPayload: bytesToHex(ivPlusCipher)
+            preqAES: forge.util.bytesToHex(encryptedKey),
+            preqPayload: forge.util.bytesToHex(ivPlusCipher)
         };
 
         const { data } = await axios.post(`${this.url}/v0/wallet/prove`, proveRequest, this.headers());
