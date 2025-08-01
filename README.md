@@ -27,7 +27,7 @@ Provides methods to initiate wallets and send funds securely:
 Provides high-level functions to backend REST API. Create an instance to pass to Wallet.
 
 ### GoogleApi
-Provides implicit OAuth authentication for Google-based wallets (client-side compatible):
+Provides OAuth 2.0 authorization code flow authentication for Google-based wallets:
 ```javascript
 const gapi = new GoogleApi("your-client-id", "your-client-secret", "redirect-url");
 const authUrl = gapi.getAuthUrl("state");
