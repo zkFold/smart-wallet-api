@@ -305,6 +305,14 @@ export class Backend {
         return headers;
     }
 
+    /**
+     * Serialize data using JSONbig to handle BigIntWrap objects properly
+     * @private
+     */
+    private serialize(data: any): string {
+        return JSONbig({ useNativeBigInt: true }).stringify(data);
+    }
+
 
     /**
      * Return wallet's address by email. The wallet can be not initialised, i.e. this function will return the adress for any email.
@@ -356,13 +364,18 @@ export class Backend {
      * @returns {CreateWalletResponse}
      */
     async createWallet(email: string, jwt: string, payment_key_hash: string, proof_bytes: ProofBytes, fund_address?: CSL.Address): Promise<CreateWalletResponse> {
-        const { data } = await axios.post(`${this.url}/v0/wallet/create`, {
+        const requestData = {
             'email': email,
             'jwt': jwt,
             'payment_key_hash': payment_key_hash,
             'proof_bytes': proof_bytes,
             'fund_address': fund_address
-        }, this.headers()
+        };
+
+        const payload = this.serialize(requestData);
+
+        const { data } = await axios.post(`${this.url}/v0/wallet/create`, payload,
+            this.headers()
         );
 
         const response: CreateWalletResponse = {
@@ -387,13 +400,18 @@ export class Backend {
      * @returns {CreateWalletResponse}
      */
     async createAndSendFunds(email: string, jwt: string, payment_key_hash: string, proof_bytes: ProofBytes, outs: Output[]): Promise<CreateWalletResponse> {
-        const { data } = await axios.post(`${this.url}/v0/wallet/create-and-send-funds`, {
+        const requestData = {
             'email': email,
             'jwt': jwt,
             'payment_key_hash': payment_key_hash,
             'proof_bytes': proof_bytes,
             'outs': outs,
-        }, this.headers()
+        };
+
+        const payload = this.serialize(requestData);
+
+        const { data } = await axios.post(`${this.url}/v0/wallet/create-and-send-funds`, payload,
+            this.headers()
         );
 
         const response: CreateWalletResponse = {
@@ -415,11 +433,16 @@ export class Backend {
      * @returns {SendFundsResponse}
      */
     async sendFunds(email: string, outs: Output[], payment_key_hash: string): Promise<SendFundsResponse> {
-        const { data } = await axios.post(`${this.url}/v0/wallet/send-funds`, {
+        const requestData = {
             'email': email,
             'outs': outs,
             'payment_key_hash': payment_key_hash,
-        }, this.headers()
+        };
+
+        const payload = this.serialize(requestData);
+
+        const { data } = await axios.post(`${this.url}/v0/wallet/send-funds`, payload,
+            this.headers()
         );
 
         const response: SendFundsResponse = {
@@ -506,8 +529,7 @@ export class Backend {
         const key = keys[0];
 
         // Use JSONbig for serialization to handle BigInt properly
-        const JSONbigStringify = JSONbig({ useNativeBigInt: true });
-        const payload = JSONbigStringify.stringify(proofInput);
+        const payload = this.serialize(proofInput);
 
         // 1. Generate AES-256 key and IV
         const aesKey = forge.random.getBytesSync(32); // 256 bits
