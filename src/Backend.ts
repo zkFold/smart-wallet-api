@@ -8,7 +8,7 @@ import forge from 'node-forge';
  * Provides a JSON representation unavailable for bignum.
  */
 export class BigIntWrap {
-    private int!: bigint; 
+    private int!: bigint;
 
     constructor(num: string | number | bigint | CSL.BigNum) {
         if (typeof num == "string") {
@@ -27,7 +27,7 @@ export class BigIntWrap {
     }
 
     increase(other: BigIntWrap): void {
-        this.int += other.int; 
+        this.int += other.int;
     }
 
     toString(): string {
@@ -46,8 +46,8 @@ export class BigIntWrap {
         return CSL.BigNum.from_str(this.int.toString());
     }
 
-    toJSON(): string {
-        return this.int.toString(); 
+    toJSON(): bigint {
+        return this.int;
     }
 }
 
@@ -57,7 +57,7 @@ export class BigIntWrap {
  *  and used in the script redeemer.
  */
 export interface ProofBytes {
-    "a_xi_int": BigIntWrap, 
+    "a_xi_int": BigIntWrap,
     "b_xi_int": BigIntWrap,
     "c_xi_int": BigIntWrap,
     "cmA_bytes": string,
@@ -86,8 +86,6 @@ export interface ProofBytes {
     "z2_xi'_int": BigIntWrap
 }
 
-export type ProofStatus = ProofBytes;
-
 export function parseProofBytes(json: string): ProofBytes | null {
     console.log(json);
     let unsafe;
@@ -101,7 +99,7 @@ export function parseProofBytes(json: string): ProofBytes | null {
     }
 
     const wrapped = {
-        "a_xi_int": new BigIntWrap(unsafe.a_xi_int), 
+        "a_xi_int": new BigIntWrap(unsafe.a_xi_int),
         "b_xi_int": new BigIntWrap(unsafe.b_xi_int),
         "c_xi_int": new BigIntWrap(unsafe.c_xi_int),
         "cmA_bytes": unsafe.cmA_bytes,
@@ -125,12 +123,12 @@ export function parseProofBytes(json: string): ProofBytes | null {
         "s1_xi_int": new BigIntWrap(unsafe.s1_xi_int),
         "s2_xi_int": new BigIntWrap(unsafe.s2_xi_int),
         "t_xi'_int": new BigIntWrap(unsafe["t_xi'_int"]),
-        "t_xi_int":  new BigIntWrap(unsafe.t_xi_int),
+        "t_xi_int": new BigIntWrap(unsafe.t_xi_int),
         "z1_xi'_int": new BigIntWrap(unsafe["z1_xi'_int"]),
         "z2_xi'_int": new BigIntWrap(unsafe["z2_xi'_int"])
     };
 
-    return wrapped; 
+    return wrapped;
 }
 
 /**
@@ -266,7 +264,7 @@ export function parseProofStatus(json: string): ProofBytes | string {
         return parseProofBytes(unsafe.contents.presBytes) || "";
     }
     return unsafe.tag;
-    
+
 }
 
 export interface ProofInput {
@@ -317,7 +315,7 @@ export class Backend {
     async walletAddress(email: string): Promise<CSL.Address> {
         const { data } = await axios.post(`${this.url}/v0/wallet/address`, {
             'email': email
-          }, this.headers() 
+        }, this.headers()
         );
         return CSL.Address.from_bech32(data.address);
     }
@@ -332,13 +330,13 @@ export class Backend {
     async isWalletInitialised(email: string, pubKeyHash: string): Promise<boolean> {
         const { data } = await axios.post(`${this.url}/v0/wallet/is-initialized`, {
             'email': email
-          }, this.headers() 
+        }, this.headers()
         );
         if (!data.is_initialized) {
             return false;
         }
         const tokenNames = data.is_initialized[1];
-        for (let i=0; i<tokenNames.length; i++) {
+        for (let i = 0; i < tokenNames.length; i++) {
             if (tokenNames[i] == pubKeyHash) {
                 return true;
             }
@@ -364,10 +362,10 @@ export class Backend {
             'payment_key_hash': payment_key_hash,
             'proof_bytes': proof_bytes,
             'fund_address': fund_address
-          }, this.headers() 
+        }, this.headers()
         );
 
-        const response: CreateWalletResponse = { 
+        const response: CreateWalletResponse = {
             address: CSL.Address.from_bech32(data.address),
             transaction: data.transaction,
             transaction_fee: data.transaction_fee,
@@ -395,10 +393,10 @@ export class Backend {
             'payment_key_hash': payment_key_hash,
             'proof_bytes': proof_bytes,
             'outs': outs,
-          }, this.headers() 
+        }, this.headers()
         );
 
-        const response: CreateWalletResponse = { 
+        const response: CreateWalletResponse = {
             address: CSL.Address.from_bech32(data.address),
             transaction: data.transaction,
             transaction_fee: data.transaction_fee,
@@ -421,10 +419,10 @@ export class Backend {
             'email': email,
             'outs': outs,
             'payment_key_hash': payment_key_hash,
-          }, this.headers() 
+        }, this.headers()
         );
 
-        const response: SendFundsResponse = { 
+        const response: SendFundsResponse = {
             transaction: data.transaction,
             transaction_fee: data.transaction_fee,
             transaction_id: data.transaction_id
@@ -443,7 +441,7 @@ export class Backend {
         const { data } = await axios.post(`${this.url}/v0/tx/submit`, { email_recipients: email_recipients, tx: tx },
             this.headers()
         );
-        
+
         return data;
     }
 
@@ -455,10 +453,10 @@ export class Backend {
      */
     async addressUtxo(address: CSL.Address): Promise<UTxO[]> {
         const { data } = await axios.post(`${this.url}/v0/utxo/addresses`, [address.to_bech32()], this.headers());
-        
+
         const result: UTxO[] = [];
 
-        for (let i=0; i<data.length; i++) {
+        for (let i = 0; i < data.length; i++) {
             const ref = data[i].ref;
             const parts = ref.split("#");
             const reference: Reference = {
@@ -467,7 +465,7 @@ export class Backend {
             }
 
             const values: { [key: string]: BigIntWrap } = {}
-            
+
             for (const key in data[i].value) {
                 values[key] = new BigIntWrap(data[i].value[key]);
             }
@@ -475,7 +473,7 @@ export class Backend {
             const utxo: UTxO = {
                 ref: reference,
                 address: CSL.Address.from_bech32(data[i].address),
-                value: values 
+                value: values
             }
             result.push(utxo);
         }
@@ -507,7 +505,9 @@ export class Backend {
         //TODO: choose the freshest one if we end up implementing key rotation
         const key = keys[0];
 
-        const payload = JSON.stringify(proofInput);
+        // Use JSONbig for serialization to handle BigInt properly
+        const JSONbigStringify = JSONbig({ useNativeBigInt: true });
+        const payload = JSONbigStringify.stringify(proofInput);
 
         // 1. Generate AES-256 key and IV
         const aesKey = forge.random.getBytesSync(32); // 256 bits
@@ -541,18 +541,16 @@ export class Backend {
         return data;
     }
 
-
-
     /**
      * Retrieve the status of a Proof Request 
      * @async
      * @param {string} Proof request ID 
      * @returns {ProofBytes | string} ProofBytes if the proof has finished or 'Pending' otherwise
      */
-    async proofStatus(proofId: string): Promise<ProofStatus | string> {
+    async proofStatus(proofId: string): Promise<ProofBytes | string> {
         const { data } = await axios.post(`${this.url}/v0/wallet/proof-status`, proofId,
             // to prevent Axios from parsing the result and messing with numbers
-            {...this.headers({ "Content-Type": "application/json"}), ...{responseType: 'text'}} 
+            { ...this.headers({ "Content-Type": "application/json" }), ...{ responseType: 'text' } }
         );
         return parseProofStatus(data);
     }
@@ -574,7 +572,7 @@ export class Backend {
                 console.log(`Status: ${response}`);
 
                 if (typeof response === 'object') {
-                    return response;  
+                    return response;
                 }
 
                 await delay(30_000);
