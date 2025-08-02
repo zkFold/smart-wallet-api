@@ -57,7 +57,7 @@ const wallet = new Wallet(
         data: "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" 
     },
     'password', // optional
-    'mainnet'
+    'Mainnet'
 );
 
 // Send 1 ADA to Gmail user  
@@ -96,7 +96,7 @@ const wallet = new Wallet(
     backend,
     { method: WalletType.Google, data: jwt },
     '', // password optional
-    'mainnet'
+    'Mainnet'
 );
 
 // Use wallet

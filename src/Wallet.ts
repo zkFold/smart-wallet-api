@@ -6,6 +6,11 @@ import { initialiseWASI, mkProofBytesMock } from './WASM';
 import { BufferUtils, hexToBytes } from './Utils';
 
 /**
+ * Supported Cardano networks
+ */
+export type Network = 'Preview' | 'Preprod' | 'Mainnet';
+
+/**
  * Whether the wallet was initialised with a mnemonic or with Gmail.
  */
 export enum WalletType {
@@ -78,17 +83,17 @@ export class Wallet {
 
     private backend: Backend;
     private method: WalletType;
-    private network: string;
+    private network: Network;
     private wasmUrl?: string;
 
     /**
      *  @param {Backend} backend         - A Backend object for communication with Cardano
      *  @param {Initialiser} initialiser - Data to initialise the wallet
      *  @param {string} password         - Optional password
-     *  @param {string} network          - Accepted values: 'mainnet', 'preprod', 'preview'
+     *  @param {Network} network         - Accepted values: 'Mainnet', 'Preprod', 'Preview'
      *  @param {WalletOptions} options   - Browser/extension compatibility options
      */
-    constructor(backend: Backend, initialiser: Initialiser, password: string = '', network: string = 'mainnet', options: WalletOptions = {}) {
+    constructor(backend: Backend, initialiser: Initialiser, password: string = '', network: Network = 'Mainnet', options: WalletOptions = {}) {
         this.backend = backend;
         this.network = network;
         this.method = initialiser.method;
@@ -169,15 +174,15 @@ export class Wallet {
                 const paymentCred = CSL.Credential.from_keyhash(this.utxoPubKey.to_raw_key().hash());
                 let netId: number = 0;
                 switch (this.network) {
-                    case "mainnet": {
+                    case "Mainnet": {
                         netId = CSL.NetworkInfo.mainnet().network_id();
                         break;
                     };
-                    case "preprod": {
+                    case "Preprod": {
                         netId = CSL.NetworkInfo.testnet_preprod().network_id();
                         break;
                     };
-                    case "preview": {
+                    case "Preview": {
                         netId = CSL.NetworkInfo.testnet_preview().network_id();
                         break;
                     };
