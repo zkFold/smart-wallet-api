@@ -375,7 +375,7 @@ export class Backend {
         const payload = this.serialize(requestData);
 
         const { data } = await axios.post(`${this.url}/v0/wallet/create`, payload,
-            this.headers()
+            this.headers({ 'Content-Type': 'application/json' })
         );
 
         const response: CreateWalletResponse = {
@@ -411,7 +411,7 @@ export class Backend {
         const payload = this.serialize(requestData);
 
         const { data } = await axios.post(`${this.url}/v0/wallet/create-and-send-funds`, payload,
-            this.headers()
+            this.headers({ 'Content-Type': 'application/json' })
         );
 
         const response: CreateWalletResponse = {
@@ -442,7 +442,7 @@ export class Backend {
         const payload = this.serialize(requestData);
 
         const { data } = await axios.post(`${this.url}/v0/wallet/send-funds`, payload,
-            this.headers()
+            this.headers({ 'Content-Type': 'application/json' })
         );
 
         const response: SendFundsResponse = {

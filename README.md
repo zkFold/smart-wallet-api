@@ -35,6 +35,12 @@ const authUrl = gapi.getAuthUrl("state");
 const jwt = await gapi.getJWT(code);
 ```
 
+### JSON Serialization
+Provides utilities for serializing and deserializing objects from this library:
+* **serialize(data: any)**: Serializes data to JSON string
+* **deserialize(jsonString: string)**: Deserializes JSON string back to JavaScript objects
+
+
 ## Usage Examples
 
 ### Mnemonic-Based Wallet
