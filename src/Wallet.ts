@@ -2,7 +2,6 @@ import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { Backend, UTxO, Output, BigIntWrap } from './Backend';
-import { initialiseWASI, mkProofBytesMock } from './WASM';
 import { BufferUtils, hexToBytes } from './Utils';
 
 /**
@@ -36,13 +35,6 @@ export interface Initialiser {
 }
 
 /**
- * Wallet configuration options for browser/extension compatibility
- */
-export interface WalletOptions {
-    wasmUrl?: string; // Custom WASM URL for browser extensions
-}
-
-/**
  * Describes the recipient of ADA
  * @property {WalletType} recipientType  - Type of wallet the recipient holds
  * @property {string} address            - Cardano address if recipientType is Mnemonic, email otherwise
@@ -72,11 +64,11 @@ export interface Asset {
  */
 export class Wallet {
     private rootKey!: CSL.Bip32PrivateKey;    // Only for Mnemonic
-    private accountKey!: CSL.Bip32PrivateKey; // Only for Mnemonic
-    private utxoPubKey!: CSL.Bip32PublicKey;  // Only for Mnemonic
+    private accountPrvKey!: CSL.Bip32PrivateKey; // Only for Mnemonic
+    private accountPubKey!: CSL.Bip32PublicKey;  // Only for Mnemonic
     private stakeKey!: CSL.Bip32PublicKey;    // Only for Mnemonic
 
-    private tokenSKey!: CSL.Bip32PrivateKey;  // Only for Google 
+    private tokenSKey!: CSL.Bip32PrivateKey;  // Only for Google
     private jwt!: string;        // Only for Google 
     private userId!: string;     // Only for Google 
     private freshKey: boolean = false;
@@ -84,7 +76,6 @@ export class Wallet {
     private backend: Backend;
     private method: WalletType;
     private network: Network;
-    private wasmUrl?: string;
 
     /**
      *  @param {Backend} backend         - A Backend object for communication with Cardano
@@ -93,11 +84,10 @@ export class Wallet {
      *  @param {Network} network         - Accepted values: 'mainnet', 'preprod', 'preview'
      *  @param {WalletOptions} options   - Browser/extension compatibility options
      */
-    constructor(backend: Backend, initialiser: Initialiser, password: string = '', network: Network = 'mainnet', options: WalletOptions = {}) {
+    constructor(backend: Backend, initialiser: Initialiser, password: string = '', network: Network = 'mainnet') {
         this.backend = backend;
         this.network = network;
         this.method = initialiser.method;
-        this.wasmUrl = options.wasmUrl;
 
         if (this.method == WalletType.Mnemonic) {
             const entropy = bip39.mnemonicToEntropy(initialiser.data, wordlist);
@@ -139,17 +129,17 @@ export class Wallet {
         if (this.method == WalletType.Google) {
             return;
         }
-        this.accountKey = this.rootKey
+        this.accountPrvKey = this.rootKey
             .derive(harden(1852)) // purpose
             .derive(harden(1815)) // coin type
             .derive(harden(0)); // account #0
 
-        this.utxoPubKey = this.accountKey
+        this.accountPubKey = this.accountPrvKey
             .derive(0) // external
             .derive(0)
             .to_public();
 
-        this.stakeKey = this.accountKey
+        this.stakeKey = this.accountPrvKey
             .derive(2) // chimeric
             .derive(0)
             .to_public();
@@ -171,7 +161,7 @@ export class Wallet {
     async getAddress(): Promise<CSL.Address> {
         switch (this.method) {
             case WalletType.Mnemonic: {
-                const paymentCred = CSL.Credential.from_keyhash(this.utxoPubKey.to_raw_key().hash());
+                const paymentCred = CSL.Credential.from_keyhash(this.accountPubKey.to_raw_key().hash());
                 let netId: number = 0;
                 switch (this.network) {
                     case "mainnet": {
@@ -404,7 +394,7 @@ export class Wallet {
                 const txBody = txBuilder.build();
 
                 const transaction = CSL.FixedTransaction.new_from_body_bytes(txBody.to_bytes());
-                transaction.sign_and_add_vkey_signature(this.accountKey.derive(0).derive(0).to_raw_key());
+                transaction.sign_and_add_vkey_signature(this.accountPrvKey.derive(0).derive(0).to_raw_key());
 
                 const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('');
                 return await this.backend.submitTx(signedTxHex);
