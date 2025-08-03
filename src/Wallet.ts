@@ -386,6 +386,12 @@ export class Wallet {
             recipientAddress = CSL.Address.from_bech32(rec.address);
         }
 
+        // Prepare email recipients list
+        const emailRecipients: string[] = [];
+        if (rec.recipientType == WalletType.Google) {
+            emailRecipients.push(rec.address);
+        }
+
         switch (this.method) {
             case WalletType.Mnemonic: {
                 // A classical transaction from an address behind a private key to another address or a smart contract
@@ -397,7 +403,7 @@ export class Wallet {
                 transaction.sign_and_add_vkey_signature(this.accountPrvKey.derive(0).derive(0).to_raw_key());
 
                 const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('');
-                return await this.backend.submitTx(signedTxHex);
+                return await this.backend.submitTx(signedTxHex, emailRecipients);
             };
 
             case WalletType.Google: {
@@ -439,7 +445,7 @@ export class Wallet {
                 transaction.sign_and_add_vkey_signature(this.tokenSKey.to_raw_key());
                 const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('');
 
-                return await this.backend.submitTx(signedTxHex);
+                return await this.backend.submitTx(signedTxHex, emailRecipients);
             };
         };
     }
