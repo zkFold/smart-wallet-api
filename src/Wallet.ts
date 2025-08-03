@@ -28,7 +28,7 @@ export enum WalletType {
  *  data is Google JSON Web Token as a string
  *  rootKey is the private key to sign transactions (can be generated randomly)
  */
-export interface Initialiser {
+export interface WalletInitialiser {
     method: WalletType;
     data: string;
     rootKey?: string;
@@ -79,12 +79,12 @@ export class Wallet {
 
     /**
      *  @param {Backend} backend         - A Backend object for communication with Cardano
-     *  @param {Initialiser} initialiser - Data to initialise the wallet
+     *  @param {WalletInitialiser} initialiser - Data to initialise the wallet
      *  @param {string} password         - Optional password
      *  @param {Network} network         - Accepted values: 'mainnet', 'preprod', 'preview'
      *  @param {WalletOptions} options   - Browser/extension compatibility options
      */
-    constructor(backend: Backend, initialiser: Initialiser, password: string = '', network: Network = 'mainnet') {
+    constructor(backend: Backend, initialiser: WalletInitialiser, password: string = '', network: Network = 'mainnet') {
         this.backend = backend;
         this.network = network;
         this.method = initialiser.method;
