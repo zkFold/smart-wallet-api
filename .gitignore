@@ -24,3 +24,4 @@ cabal.project.local~
 .ghc.environment.*
 stack.yaml*
 .DS_Store
+package-lock.json

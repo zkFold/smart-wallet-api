@@ -1,5 +1,6 @@
 export * from './src/Backend'
 export * from './src/GoogleToken'
 export * from './src/JSON'
+export * from './src/Prover'
 export * from './src/Utils'
 export * from './src/Wallet'
