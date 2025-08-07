@@ -1,7 +1,9 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { Backend, UTxO, Output, BigIntWrap } from './Backend';
+import { Backend } from './Backend';
+import { UTxO, Output, BigIntWrap } from './Types';
+import { Prover } from './Prover';
 import { BufferUtils, hexToBytes } from './Utils';
 
 /**
@@ -74,6 +76,7 @@ export class Wallet {
     private freshKey: boolean = false;
 
     private backend: Backend;
+    private prover: Prover;
     private method: WalletType;
     private network: Network;
 
@@ -84,8 +87,9 @@ export class Wallet {
      *  @param {Network} network         - Accepted values: 'mainnet', 'preprod', 'preview'
      *  @param {WalletOptions} options   - Browser/extension compatibility options
      */
-    constructor(backend: Backend, initialiser: WalletInitialiser, password: string = '', network: Network = 'mainnet') {
+    constructor(backend: Backend, prover: Prover, initialiser: WalletInitialiser, password: string = '', network: Network = 'mainnet') {
         this.backend = backend;
+        this.prover = prover;
         this.network = network;
         this.method = initialiser.method;
 
@@ -436,7 +440,7 @@ export class Wallet {
 
                     //const instance = await initialiseWASI();
                     //const proofBytes = mkProofBytesMock(instance, 0n, new Array(19).fill(0n), empi);
-                    const proofBytes = await this.backend.prove(empi);
+                    const proofBytes = await this.prover.prove(empi);
 
                     const resp = await this.backend.createAndSendFunds(this.userId, header + '.' + payload, pubkeyHex, proofBytes, outs);
                     txHex = resp.transaction;

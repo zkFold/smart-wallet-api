@@ -1,7 +1,7 @@
 import { WASI } from "../wasm-bindings/wasi.js";
 import ghc_wasm_jsffi from "../wasm-bindings/ghc_wasm_jsffi.js";
 import { blake2b } from "../wasm-bindings/blake2b.js";
-import { parseProofBytes } from './Backend';
+import { parseProofBytes } from './JSON';
 
 /**
  * Browser-compatible WASM loader
