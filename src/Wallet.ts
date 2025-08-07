@@ -1,7 +1,8 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { Backend, UTxO, Output, BigIntWrap } from './Backend';
+import { Backend } from './Backend';
+import { UTxO, Output, BigIntWrap } from './Types';
 import { Prover } from './Prover';
 import { BufferUtils, hexToBytes } from './Utils';
 
