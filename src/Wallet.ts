@@ -71,8 +71,8 @@ export class Wallet {
     private stakeKey!: CSL.Bip32PublicKey;    // Only for Mnemonic
 
     private tokenSKey!: CSL.Bip32PrivateKey;  // Only for Google
-    private jwt!: string;        // Only for Google 
-    private userId!: string;     // Only for Google 
+    private jwt!: string;        // Only for Google
+    private userId!: string;     // Only for Google
     private freshKey: boolean = false;
 
     private backend: Backend;
