@@ -9,7 +9,7 @@ import { hexToBytes } from './Utils';
  */
 export enum AddressType {
     Bech32 = 0,
-    Google = 1
+    Email = 1
 }
 
 /**
@@ -19,8 +19,8 @@ export enum AddressType {
  *  rootKey is the private key to sign transactions (can be generated randomly)
  */
 export interface WalletInitialiser {
-    data: string;
-    rootKey?: string;
+    jwt: string;
+    tokenSKey?: string;
 }
 
 /**
@@ -70,13 +70,13 @@ export class Wallet {
         this.prover = prover;
 
         // At this point, we assume that userId is a valid email accessible by the user (i.e. the user was able to complete Google authentication).
-        this.jwt = initialiser.data;
+        this.jwt = initialiser.jwt;
 
         const parts = this.jwt.split(".");
         const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
         this.userId = payload.email;
 
-        if (!initialiser.rootKey) {
+        if (!initialiser.tokenSKey) {
             const prvKey = CSL.Bip32PrivateKey
                 .generate_ed25519_bip32()
                 .derive(harden(1852)) // purpose
@@ -87,7 +87,7 @@ export class Wallet {
             this.tokenSKey = prvKey;
             this.freshKey = true;
         } else {
-            this.tokenSKey = CSL.Bip32PrivateKey.from_hex(initialiser.rootKey);
+            this.tokenSKey = CSL.Bip32PrivateKey.from_hex(initialiser.tokenSKey);
         }
     }
 
@@ -206,7 +206,7 @@ export class Wallet {
 
         let recipientAddress;
 
-        if (rec.recipientType == AddressType.Google) {
+        if (rec.recipientType == AddressType.Email) {
             recipientAddress = await this.addressForGmail(rec.address);
         } else {
             recipientAddress = CSL.Address.from_bech32(rec.address);
@@ -214,7 +214,7 @@ export class Wallet {
 
         // Prepare email recipients list
         const emailRecipients: string[] = [];
-        if (rec.recipientType == AddressType.Google) {
+        if (rec.recipientType == AddressType.Email) {
             emailRecipients.push(rec.address);
         }
 

@@ -30,7 +30,7 @@ export class Prover {
     }
 
     /**
-     * Get all public keys held by the Backend 
+     * Get all public keys held by the Prover 
      * @async
      * @returns {BackendKey[]}
      */
@@ -42,7 +42,7 @@ export class Prover {
 
 
     /**
-     * Submit a proof request to the Backend. It will return a Request ID which can be used to retrieve proof status
+     * Submit a proof request to the Prover. It will return a Request ID which can be used to retrieve proof status
      * @async
      * @param {ProofInput} inputs for the expMod circuit: exponent, modulus, signature and token name
      * @returns {string} proof request ID
@@ -53,7 +53,6 @@ export class Prover {
         //TODO: choose the freshest one if we end up implementing key rotation
         const key = keys[0];
 
-        // Use JSONbig for serialization to handle BigInt properly
         const payload = serialize(proofInput);
 
         // 1. Generate AES-256 key and IV
@@ -103,7 +102,7 @@ export class Prover {
     }
 
     /**
-     * Obtain a Proof from the backend. Unlike requestProof(), this method waits for the proof completion 
+     * Obtain a Proof from the Prover. Unlike requestProof(), this method waits for the proof completion 
      * @async
      * @param {ProofInput} inputs for the expMod circuit: exponent, modulus, signature and token name
      * @returns {ProofBytes} ZK proof bytes for the expMod circuit 
