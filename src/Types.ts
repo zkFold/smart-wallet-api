@@ -1,7 +1,7 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 
 /**
- * Wrapper for various integer types used in communication with the backend and CSL.
+ * Wrapper for various integer types used in communication with the Backend, Prover, and CSL.
  * Provides a JSON representation unavailable for bignum.
  */
 export class BigIntWrap {
