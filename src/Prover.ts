@@ -1,7 +1,6 @@
 import axios from 'axios';
-import JSONbig from 'json-bigint';
 import forge from 'node-forge';
-import { BigIntWrap, ProofBytes, PublicKey, BackendKey, ProofInput } from './Types';
+import { ProofBytes, BackendKey, ProofInput } from './Types';
 import { serialize, parseBackendKeys, parseProofStatus } from './JSON';
 
 
