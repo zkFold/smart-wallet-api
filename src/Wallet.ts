@@ -26,8 +26,8 @@ export interface WalletInitialiser {
 /**
  * Describes the recipient of ADA
  * @property {AddressType} recipientType  - Type of wallet the recipient holds
- * @property {string} address            - Cardano address if recipientType is Bech32, email otherwise
- * @property {Asset} assets              - A dictionary of assets to send. For ADA, use 'lovelace' as the key. For other assets, use the format '<PolicyID>.<AssetName>'
+ * @property {string} address             - Cardano address if recipientType is Bech32, email otherwise
+ * @property {Asset} assets               - A dictionary of assets to send. For ADA, use 'lovelace' as the key. For other assets, use the format '<PolicyID>.<AssetName>'
  */
 export class SmartTxRecipient {
     recipientType: AddressType;

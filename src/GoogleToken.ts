@@ -15,7 +15,7 @@ export class GoogleApi {
     }
 
     getAuthUrl(state: string): string {
-        // Example access scopes for zkLogin: user email and public profile info are used.
+        // Example access scopes for Web2 login: user email is used.
         const scopes = [
             'https://www.googleapis.com/auth/userinfo.email',
             'openid',
