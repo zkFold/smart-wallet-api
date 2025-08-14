@@ -197,7 +197,7 @@ export class Wallet {
      * Send funds from this wallet to a recipient.
      *
      * @async
-     * @param {SmartTxRecipient} rec - A recipient with a Cardano or a gmail address
+     * @param {SmartTxRecipient} rec - A recipient with a Cardano or a email address
      */
     async sendTo(rec: SmartTxRecipient): Promise<string> {
         console.log(rec.recipientType);
