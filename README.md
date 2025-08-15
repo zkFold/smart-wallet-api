@@ -4,6 +4,12 @@ This package provides a Smart Wallet API to manage Google OAuth-based wallets. I
 
 ## Installation
 
+The package is published on npm:
+
+https://www.npmjs.com/package/zkfold-smart-wallet-api
+
+You can install it by executing
+
 ```bash
 npm install zkfold-smart-wallet-api
 ```
