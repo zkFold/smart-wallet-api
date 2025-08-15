@@ -1,11 +1,6 @@
 # zkFold Smart Wallet API
 
-This package provides a Smart Wallet API to manage both mnemonic-b# Send funds
-await wallet.sendTo(new SmartTxRecipient(
-    AddressType.Email, 
-    "recipient@gmail.com",
-    { lovelace: new BigIntWrap(2000000) } // 2 ADA
-));nd Google OAuth-based wallets.
+This package provides a Smart Wallet API to manage Google OAuth-based wallets. In this wallet, funds are locked in a smart contract that verifies Google's signatures of a successful user login.
 
 ## Installation
 
