@@ -1,6 +1,6 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import { Backend } from './Backend';
-import { UTxO, Output, BigIntWrap } from './Types';
+import { UTxO, Output, BigIntWrap, SubmitTxResult } from './Types';
 import { Prover } from './Prover';
 import { hexToBytes } from './Utils';
 
@@ -199,7 +199,7 @@ export class Wallet {
      * @async
      * @param {SmartTxRecipient} rec - A recipient with a Cardano or a email address
      */
-    async sendTo(rec: SmartTxRecipient): Promise<string> {
+    async sendTo(rec: SmartTxRecipient): Promise<SubmitTxResult> {
         console.log(rec.recipientType);
         console.log(rec.address);
         console.log(rec.assets);
@@ -243,6 +243,7 @@ export class Wallet {
             const proofBytes = await this.prover.prove(empi);
             const resp = await this.backend.createAndSendFunds(this.userId, header + '.' + payload, pubkeyHex, proofBytes, outs);
             txHex = resp.transaction;
+            this.freshKey = false;
         }
         const transaction = CSL.FixedTransaction.from_bytes(hexToBytes(txHex));
         transaction.sign_and_add_vkey_signature(this.tokenSKey.to_raw_key());
