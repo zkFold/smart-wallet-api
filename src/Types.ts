@@ -182,6 +182,17 @@ export interface SendFundsResponse {
 }
 
 /**
+ *  Transaction ID and email delivery errors, if any 
+ *
+ *  @property {string}      client_id         - Google OAuth client id
+ *  @property {string}      tx_is             - Transaction ID 
+ */
+export interface SubmitTxResult {
+    notifier_errors: string[][],
+    tx_id: string
+}
+
+/**
  *  RSA public key provided by the prover 
  *
  *  @property {BigIntWrap}      public_e    - Public exponent 
@@ -220,3 +231,13 @@ export interface ProofInput {
     piTokenName: BigIntWrap,
 }
 
+/**
+ *  Google OAuth client credentials 
+ *
+ *  @property {string}      client_id         - Google OAuth client id
+ *  @property {string}      client_secret     - Google OAuth client secret
+ */
+export interface ClientCredentials {
+    client_id: string,
+    client_secret: string
+}

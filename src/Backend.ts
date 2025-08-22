@@ -1,7 +1,7 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import axios from 'axios';
 import { serialize } from './JSON';
-import { BigIntWrap, ProofBytes, Output, Reference, UTxO, CreateWalletResponse, SendFundsResponse } from './Types'
+import { BigIntWrap, ProofBytes, Output, Reference, UTxO, CreateWalletResponse, SendFundsResponse, SubmitTxResult, ClientCredentials } from './Types'
 
 /**
  * A wrapper for interaction with the backend.
@@ -38,10 +38,18 @@ export class Backend {
      * Return wallet's address by email. The wallet can be not initialised, i.e. this function will return the adress for any email.
      * @async
      * @param {string} email
+     * @param {string} version - Version of the on=chain wallet script. Defaults to the most recent one 
      * @returns {CSL.Address}
      */
-    async walletAddress(email: string): Promise<CSL.Address> {
-        const { data } = await axios.post(`${this.url}/v0/wallet/address`, {
+    async walletAddress(email: string, version: string = ''): Promise<CSL.Address> {
+        let url: string;
+        if (!version) {
+            url = `${this.url}/v0/wallet/address`;
+        } else {
+            url = `${this.url}/v0/wallet/${version}/address`;
+        }
+
+        const { data } = await axios.post(url, {
             'email': email
         }, this.headers()
         );
@@ -53,10 +61,17 @@ export class Backend {
      * @async
      * @param {string} email
      * @param {string} pubKeyHash - Token name (the hash of a public key used to initialise the wallet)
+     * @param {string} version    - Version of the on=chain wallet script. Defaults to the most recent one 
      * @returns {boolean}
      */
-    async isWalletInitialised(email: string, pubKeyHash: string): Promise<boolean> {
-        const { data } = await axios.post(`${this.url}/v0/wallet/is-initialized`, {
+    async isWalletInitialised(email: string, pubKeyHash: string, version: string = ''): Promise<boolean> {
+        let url: string;
+        if (!version) {
+            url = `${this.url}/v0/wallet/is-initialized`;
+        } else {
+            url = `${this.url}/v0/wallet/${version}/is-initialized`;
+        }
+        const { data } = await axios.post(url, {
             'email': email
         }, this.headers()
         );
@@ -81,9 +96,10 @@ export class Backend {
      * @param {string} paymenk_key_hash  - Token name (the hash of a public key used to initialise the wallet)
      * @param {ProofBytes} proof_bytes   - Zero-knowledge proof that the user possesses a valid JWT
      * @param {CSL.Address} fund_address - Address which wll fund the transaction (defaults to the wallet's address)
+     * @param {string} version           - Version of the on=chain wallet script. Defaults to the most recent one 
      * @returns {CreateWalletResponse}
      */
-    async createWallet(email: string, jwt: string, payment_key_hash: string, proof_bytes: ProofBytes, fund_address?: CSL.Address): Promise<CreateWalletResponse> {
+    async createWallet(email: string, jwt: string, payment_key_hash: string, proof_bytes: ProofBytes, fund_address?: CSL.Address, version: string = ''): Promise<CreateWalletResponse> {
         const requestData = {
             'email': email,
             'jwt': jwt,
@@ -94,7 +110,13 @@ export class Backend {
 
         const payload = serialize(requestData);
 
-        const { data } = await axios.post(`${this.url}/v0/wallet/create`, payload,
+        let url: string;
+        if (!version) {
+            url = `${this.url}/v0/wallet/create`;
+        } else {
+            url = `${this.url}/v0/wallet/${version}/create`;
+        }
+        const { data } = await axios.post(url, payload,
             this.headers({ 'Content-Type': 'application/json' })
         );
 
@@ -117,9 +139,10 @@ export class Backend {
      * @param {string} paymenk_key_hash  - Token name (the hash of a public key used to initialise the wallet)
      * @param {ProofBytes} proof_bytes   - Zero-knowledge proof that the user possesses a valid JWT
      * @param {Output[]} outs            - Transaction outputs (where to send funds)
+     * @param {string} version           - Version of the on=chain wallet script. Defaults to the most recent one 
      * @returns {CreateWalletResponse}
      */
-    async createAndSendFunds(email: string, jwt: string, payment_key_hash: string, proof_bytes: ProofBytes, outs: Output[]): Promise<CreateWalletResponse> {
+    async createAndSendFunds(email: string, jwt: string, payment_key_hash: string, proof_bytes: ProofBytes, outs: Output[], version: string = ''): Promise<CreateWalletResponse> {
         const requestData = {
             'email': email,
             'jwt': jwt,
@@ -130,7 +153,14 @@ export class Backend {
 
         const payload = serialize(requestData);
 
-        const { data } = await axios.post(`${this.url}/v0/wallet/create-and-send-funds`, payload,
+        let url: string;
+        if (!version) {
+            url = `${this.url}/v0/wallet/create-and-send-funds`;
+        } else {
+            url = `${this.url}/v0/wallet/${version}/create-and-send-funds`;
+        }
+
+        const { data } = await axios.post(url, payload,
             this.headers({ 'Content-Type': 'application/json' })
         );
 
@@ -150,9 +180,10 @@ export class Backend {
      * @param {string} email
      * @param {Output[]} outs            - Transaction outputs (where to send funds)
      * @param {string} paymenk_key_hash  - Token name (the hash of a public key used to initialise the wallet)
+     * @param {string} version           - Version of the on=chain wallet script. Defaults to the most recent one 
      * @returns {SendFundsResponse}
      */
-    async sendFunds(email: string, outs: Output[], payment_key_hash: string): Promise<SendFundsResponse> {
+    async sendFunds(email: string, outs: Output[], payment_key_hash: string, version: string = ''): Promise<SendFundsResponse> {
         const requestData = {
             'email': email,
             'outs': outs,
@@ -161,7 +192,14 @@ export class Backend {
 
         const payload = serialize(requestData);
 
-        const { data } = await axios.post(`${this.url}/v0/wallet/send-funds`, payload,
+        let url: string;
+        if (!version) {
+            url = `${this.url}/v0/wallet/send-funds`;
+        } else {
+            url = `${this.url}/v0/wallet/${version}/send-funds`;
+        }
+
+        const { data } = await axios.post(url, payload,
             this.headers({ 'Content-Type': 'application/json' })
         );
 
@@ -178,9 +216,9 @@ export class Backend {
      * Submit a CBOR-encoded transaction. 
      * @async
      * @param {string} tx
-     * @returns {string} - Transaction ID
+     * @returns {SubmitTxResult} - Transaction ID and email delivery errors, if any
      */
-    async submitTx(tx: string, email_recipients: string[] = []): Promise<string> {
+    async submitTx(tx: string, email_recipients: string[] = []): Promise<SubmitTxResult> {
         const { data } = await axios.post(`${this.url}/v0/tx/submit`, { email_recipients: email_recipients, tx: tx },
             this.headers()
         );
@@ -195,7 +233,7 @@ export class Backend {
      * @returns {UTxO[]}
      */
     async addressUtxo(address: CSL.Address): Promise<UTxO[]> {
-        const { data } = await axios.post(`${this.url}/v0/utxo/addresses`, [address.to_bech32()], this.headers());
+        const { data } = await axios.post(`${this.url}/v0/address/utxos`, [address.to_bech32()], this.headers());
 
         const result: UTxO[] = [];
 
@@ -222,6 +260,17 @@ export class Backend {
         }
 
         return result;
+    }
+
+    /**
+     * Get Google OAuth credentials 
+     * @async
+     * @param {string} clientName 
+     * @returns {ClientCredentials}
+     */
+    async credentials(clientName: string): Promise<ClientCredentials> {
+        const { data } = await axios.post(`${this.url}/v0/oauth/credentials`, { 'client_name': clientName }, this.headers());
+        return data;
     }
 
 }
