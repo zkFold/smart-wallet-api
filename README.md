@@ -61,29 +61,40 @@ Provides utilities for serializing and deserializing objects from this library:
 * **deserialize(jsonString: string)**: Deserializes JSON string back to JavaScript objects
 
 
-## Example
+## Usage Example
 
-```javascript
-import { Wallet, Backend, GoogleApi, Prover, SmartTxRecipient, AddressType, BigIntWrap } from 'zkfold-smart-wallet-api';
+### Step 1: Initiating Google OAuth flow
 
-const backend = new Backend('https://api.wallet.zkfold.io', 'api-key');
+```typescript
+import { GoogleApi, Backend, Prover } from 'zkfold-smart-wallet-api';
 
-const prover = new Prover('https://prover.zkfold.io');
+// Get OAuth credentials from backend
+const backend = new Backend('https://wallet-api.zkfold.io', 'your-api-key');
+const prover = new Prover('https://wallet-prover.zkfold.io');
+const credentials = await backend.credentials('your-client-name');
 
+// Setup Google OAuth
 const gapi = new GoogleApi(
-    "your-google-client-id.apps.googleusercontent.com", 
-    "your-google-client-secret",
+    credentials.client_id,
+    credentials.client_secret,
     "https://your-app.com/oauth/callback"
 );
 
-// Generate auth URL and redirect user
-const state = crypto.randomUUID();
-const authUrl = gapi.getAuthUrl(state);
-// Redirect user to authUrl...
+// Redirect to Google
+const authUrl = gapi.getAuthUrl('random-state');
+window.location.href = authUrl;
+```
 
-// After OAuth callback, extract code from URL parameters and exchange for JWT
+### Step 2: Handling OAuth callback
+
+```typescript
+import { GoogleApi, Wallet } from 'zkfold-smart-wallet-api';
+
+// Extract authorization code from URL
 const urlParams = new URLSearchParams(window.location.search);
 const code = urlParams.get('code');
+
+// Exchange code for JWT
 const jwt = await gapi.getJWT(code);
 
 // Create wallet
@@ -93,14 +104,42 @@ const wallet = new Wallet(
     { jwt: jwt }
 );
 
-// Use wallet
+// Get the user's email
+const email = wallet.getEmail();
+```
+
+### Step 3: Querying user information
+
+```typescript
+import { Wallet } from 'zkfold-smart-wallet-api';
+
+// Get the user's email
+const email = wallet.getEmail();
+
+// Get the user's Cardano address
 const address = await wallet.getAddress();
+
+// Get the user's balance
 const balance = await wallet.getBalance();
 
-// Send funds
+```
+
+### Step 4: Making payments
+
+```typescript
+import { Wallet, SmartTxRecipient, AddressType, BigIntWrap } from 'zkfold-smart-wallet-api';
+
+// Send to email address
 await wallet.sendTo(new SmartTxRecipient(
     AddressType.Email, 
     "recipient@gmail.com",
-    { lovelace: new BigIntWrap(2000000) } // 2 ADA
+    { lovelace: new BigIntWrap(2000000) }
+));
+
+// Send to Cardano address
+await wallet.sendTo(new SmartTxRecipient(
+    AddressType.Bech32, 
+    "addr_test1qr...",
+    { lovelace: new BigIntWrap(1500000) }
 ));
 ```
