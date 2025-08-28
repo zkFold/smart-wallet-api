@@ -91,6 +91,10 @@ export class Wallet {
         }
     }
 
+    getEmail(): string {
+        return this.userId;
+    }
+
     /**
      * @async
      * Get the Cardano address for a gmail address
