@@ -268,8 +268,8 @@ export class Backend {
      * @param {string} clientName 
      * @returns {ClientCredentials}
      */
-    async credentials(clientName: string): Promise<ClientCredentials> {
-        const { data } = await axios.post(`${this.url}/v0/oauth/credentials`, { 'client_name': clientName }, this.headers());
+    async credentials(): Promise<ClientCredentials> {
+        const { data } = await axios.get(`${this.url}/v0/oauth/credentials`, this.headers());
         return data;
     }
 
