@@ -77,9 +77,9 @@ export class Prover {
         const encryptedKey = publicKey.encrypt(aesKey, 'RSAES-PKCS1-V1_5');
 
         const proveRequest = {
-            preqKeyId: key.pkbId,
-            preqAES: forge.util.bytesToHex(encryptedKey),
-            preqPayload: forge.util.bytesToHex(ivPlusCipher)
+            server_key_id: key.pkbId,
+            aes_encryption_key: forge.util.bytesToHex(encryptedKey),
+            encrypted_payload: forge.util.bytesToHex(ivPlusCipher)
         };
 
         const { data } = await axios.post(`${this.url}/v0/prove`, proveRequest, this.headers());
