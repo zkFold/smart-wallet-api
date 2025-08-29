@@ -52,8 +52,8 @@ export interface Asset {
  * The Wallet which can be initialised with an email address.
  */
 export class Wallet {
-    private tokenSKey!: CSL.Bip32PrivateKey;
     private jwt!: string;
+    private tokenSKey!: CSL.Bip32PrivateKey;
     private userId!: string;
     private freshKey: boolean = false;
 
@@ -245,7 +245,7 @@ export class Wallet {
             };
 
             const proofBytes = await this.prover.prove(empi);
-            const resp = await this.backend.createAndSendFunds(this.userId, header + '.' + payload, pubkeyHex, proofBytes, outs);
+            const resp = await this.backend.activateAndSendFunds(this.userId, header + '.' + payload, pubkeyHex, proofBytes, outs);
             txHex = resp.transaction;
             this.freshKey = false;
         }

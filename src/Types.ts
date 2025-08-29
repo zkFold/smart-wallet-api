@@ -87,15 +87,16 @@ export interface ProofBytes {
  * Transaction output as expected by the backend.
  *
  * @property {string} address 
- * @property {Array}  datum
+ * @property {TxDatum} datum  - Optional datum (inline or just hash) to be included
  * @property {object} value 
  *
  * @example
  *
  * { "address": "addr_test1qrsuhwqdhz0zjgnf46unas27h93amfghddnff8lpc2n28rgmjv8f77ka0zshfgssqr5cnl64zdnde5f8q2xt923e7ctqu49mg5",
- *    "datum": [
- *      "?"
- *    ],
+ *    "datum": {
+ *      "datum": "some_datum_data",
+ *      "is_inline": true
+ *    },
  *    "value": {
  *      "ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef.474f4c44": 101,
  *      "lovelace": 22
@@ -104,10 +105,21 @@ export interface ProofBytes {
  */
 export interface Output {
     address: string,
-    datum?: string[],
+    datum?: TxDatum,
     value: {
         [key: string]: BigIntWrap;
     }
+}
+
+/**
+ * Optional datum (inline or just hash) to be included.
+ * 
+ * @property {any} datum - Datum data
+ * @property {boolean} is_inline - true for inline datum, false for just datum hash
+ */
+export interface TxDatum {
+    datum: any,
+    is_inline: boolean
 }
 
 /**
@@ -184,12 +196,23 @@ export interface SendFundsResponse {
 /**
  *  Transaction ID and email delivery errors, if any 
  *
- *  @property {string}      client_id         - Google OAuth client id
- *  @property {string}      tx_is             - Transaction ID 
+ * @property {string}      transaction_id         - Transaction ID 
+ * @property {Array}       notifier_errors        - Recipients who were not notified
  */
 export interface SubmitTxResult {
-    notifier_errors: string[][],
-    tx_id: string
+    transaction_id: string,
+    notifier_errors: FailedNotification[]
+}
+
+/**
+ * Email address to which notification couldn't be delivered and the reason.
+ * 
+ * @property {string} email - Email address
+ * @property {string} error - The reason why notification failed
+ */
+export interface FailedNotification {
+    email: string,
+    error: string
 }
 
 /**
