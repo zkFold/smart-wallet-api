@@ -85,15 +85,8 @@ export function parseBackendKeys(json: any[]): BackendKey[] {
 export function parseProofStatus(json: string): ProofBytes | string {
     const parser = JSONbig({ useNativeBigInt: true });
     const unsafe = parser.parse(json);
-    if (unsafe.Completed) {
-        return parseProofBytes(unsafe.Completed.bytes) || "";
+    if (unsafe.tag == "Completed") {
+        return parseProofBytes(unsafe.contents.bytes) || "";
     }
-
-    // If "Pending" property exists, return "Pending"
-    if (unsafe.Pending !== undefined) {
-        return "Pending";
-    }
-
-    // Fallback for unknown status
-    return "Unknown";
+    return unsafe.tag;
 }
