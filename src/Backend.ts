@@ -62,15 +62,13 @@ export class Backend {
      * Activate a Smart Wallet.
      * This will create a minting transaction which should be signed and submitted.
      * @async
-     * @param {string} email
      * @param {string} jwt    - Base64url-decoded Google JSON web token without signature
      * @param {string} payment_key_hash  - Token name (the hash of a public key used to initialise the wallet)
      * @param {ProofBytes} proof_bytes   - Zero-knowledge proof that the user possesses a valid JWT
      * @returns {CreateWalletResponse}
      */
-    async activateWallet(email: string, jwt: string, payment_key_hash: string, proof_bytes: ProofBytes): Promise<CreateWalletResponse> {
+    async activateWallet(jwt: string, payment_key_hash: string, proof_bytes: ProofBytes): Promise<CreateWalletResponse> {
         const requestData = {
-            'email': email,
             'jwt': jwt,
             'payment_key_hash': payment_key_hash,
             'proof_bytes': proof_bytes
@@ -96,16 +94,14 @@ export class Backend {
      * Activate a Smart Wallet and send funds from it.
      * This will create transaction which should be signed and submitted.
      * @async
-     * @param {string} email
      * @param {string} jwt    - Base64url-decoded Google JSON web token without signature
      * @param {string} payment_key_hash  - Token name (the hash of a public key used to initialise the wallet)
      * @param {ProofBytes} proof_bytes   - Zero-knowledge proof that the user possesses a valid JWT
      * @param {Output[]} outs            - Transaction outputs (where to send funds)
      * @returns {CreateWalletResponse}
      */
-    async activateAndSendFunds(email: string, jwt: string, payment_key_hash: string, proof_bytes: ProofBytes, outs: Output[]): Promise<CreateWalletResponse> {
+    async activateAndSendFunds(jwt: string, payment_key_hash: string, proof_bytes: ProofBytes, outs: Output[]): Promise<CreateWalletResponse> {
         const requestData = {
-            'email': email,
             'jwt': jwt,
             'payment_key_hash': payment_key_hash,
             'proof_bytes': proof_bytes,

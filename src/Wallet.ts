@@ -245,7 +245,7 @@ export class Wallet {
             };
 
             const proofBytes = await this.prover.prove(empi);
-            const resp = await this.backend.activateAndSendFunds(this.userId, header + '.' + payload, pubkeyHex, proofBytes, outs);
+            const resp = await this.backend.activateAndSendFunds(header + '.' + payload, pubkeyHex, proofBytes, outs);
             txHex = resp.transaction;
             this.freshKey = false;
         }
