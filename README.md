@@ -65,12 +65,13 @@ Provides utilities for serializing and deserializing objects from this library:
 
 ### Step 1: Initiating Google OAuth flow
 
+This step sets up the Google OAuth flow, which is required to create a Smart Wallet instance.
+
 ```typescript
 import { GoogleApi, Backend, Prover } from 'zkfold-smart-wallet-api';
 
 // Get OAuth credentials from backend
 const backend = new Backend('https://wallet-api.zkfold.io', 'your-api-key');
-const prover = new Prover('https://wallet-prover.zkfold.io');
 const credentials = await backend.credentials('your-client-name');
 
 // Setup Google OAuth
@@ -87,6 +88,8 @@ window.location.href = authUrl;
 
 ### Step 2: Handling OAuth callback
 
+After the user completes the Google OAuth, they will be redirected back to your application with an authorization code. This step shows how to exchange that code for a JWT token and create a Smart Wallet instance.
+
 ```typescript
 import { GoogleApi, Wallet } from 'zkfold-smart-wallet-api';
 
@@ -97,18 +100,20 @@ const code = urlParams.get('code');
 // Exchange code for JWT
 const jwt = await gapi.getJWT(code);
 
+// Initialize prover
+const prover = new Prover('https://wallet-prover.zkfold.io');
+
 // Create wallet
 const wallet = new Wallet(
     backend,
     prover,
     { jwt: jwt }
 );
-
-// Get the user's email
-const email = wallet.getEmail();
 ```
 
 ### Step 3: Querying user information
+
+Once you have a wallet instance, you can query various information about the user's account, including their email, Cardano address, and current balance.
 
 ```typescript
 import { Wallet } from 'zkfold-smart-wallet-api';
@@ -125,6 +130,8 @@ const balance = await wallet.getBalance();
 ```
 
 ### Step 4: Making payments
+
+The smart wallet supports sending funds to both email addresses (other Smart Wallets) and traditional Cardano addresses.
 
 ```typescript
 import { Wallet, SmartTxRecipient, AddressType, BigIntWrap } from 'zkfold-smart-wallet-api';
