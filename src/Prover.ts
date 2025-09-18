@@ -73,8 +73,16 @@ export class Prover {
         const e = new forge.jsbn.BigInteger(key.pkbPublic.public_e.toString(), 10);
         const publicKey = forge.pki.setRsaPublicKey(n, e);
 
-        // 5. Encrypt AES key using RSA PKCS#1 v1.5
-        const encryptedKey = publicKey.encrypt(aesKey, 'RSAES-PKCS1-V1_5');
+        const oaepOptions = {
+            md: forge.md.sha256.create(),          // hash for OAEP
+            mgf1: {
+              md: forge.md.sha256.create()         // hash for MGF1
+            },
+            label: ''
+          };
+
+        // 5. Encrypt AES key using RSA OAEP 
+        const encryptedKey = publicKey.encrypt(aesKey, 'RSA-OAEP', oaepOptions);
 
         const proveRequest = {
             server_key_id: key.pkbId,
