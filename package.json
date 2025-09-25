@@ -8,8 +8,7 @@
   "type": "module",
   "files": [
     "dist",
-    "wasm-bindings",
-    "src/proof.wasm"
+    "wasm-bindings"
   ],
   "scripts": {
     "build": "vite build",
