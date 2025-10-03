@@ -72,7 +72,7 @@ export interface ProofBytes {
     "h1_xi'_int": BigIntWrap,
     "h2_xi_int": BigIntWrap,
     "l1_xi": BigIntWrap,
-    "l_xi": BigIntWrap,
+    "l_xi": BigIntWrap[],
     "proof1_bytes": string,
     "proof2_bytes": string,
     "s1_xi_int": BigIntWrap,
