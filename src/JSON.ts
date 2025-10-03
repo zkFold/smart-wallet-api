@@ -32,6 +32,12 @@ export function parseProofBytes(json: string): ProofBytes | null {
         return null;
     }
 
+    let l_xi = [];
+
+    for (let i = 0; i < unsafe.l_xi.length; ++i) {
+        l_xi.push(new BigIntWrap(unsafe.l_xi[i]));
+    }
+
     const wrapped = {
         "a_xi_int": new BigIntWrap(unsafe.a_xi_int),
         "b_xi_int": new BigIntWrap(unsafe.b_xi_int),
@@ -51,7 +57,7 @@ export function parseProofBytes(json: string): ProofBytes | null {
         "h1_xi'_int": new BigIntWrap(unsafe["h1_xi'_int"]),
         "h2_xi_int": new BigIntWrap(unsafe.h2_xi_int),
         "l1_xi": new BigIntWrap(unsafe.l1_xi),
-        "l_xi": new BigIntWrap(unsafe.l_xi),
+        "l_xi": l_xi,
         "proof1_bytes": unsafe.proof1_bytes,
         "proof2_bytes": unsafe.proof2_bytes,
         "s1_xi_int": new BigIntWrap(unsafe.s1_xi_int),
