@@ -1,5 +1,18 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
-import { WalletInitialiser } from './Wallet';
+
+// Smart Wallet version
+export type Version = 'v0'
+
+/**
+ * Data required to initialise a wallet.
+ * 
+ *  data is Google JSON Web Token as a string
+ *  rootKey is the private key to sign transactions (can be generated randomly)
+ */
+export interface WalletInitialiser {
+    jwt: string;
+    tokenSKey?: string;
+}
 
 /**
  * Wrapper for various integer types used in communication with the Backend, Prover, and CSL.
@@ -264,16 +277,4 @@ export interface ProofInput {
 export interface ClientCredentials {
     client_id: string,
     client_secret: string
-}
-
-export type Version = 'v0'
-
-export interface SmartWalletStorage {
-    version: Version
-    // Activated wallets
-    wallets: { [addr: string]: WalletInitialiser }
-}
-
-export interface SmartWalletSession {
-    oauth_state: string | null
 }

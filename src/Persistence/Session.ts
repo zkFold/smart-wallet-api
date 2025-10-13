@@ -1,5 +1,8 @@
 import { serialize, deserialize } from '../JSON';
-import { SmartWalletSession } from '../Types';
+
+interface SessionI {
+    oauth_state: string | null
+}
 
 export class Session {
   private readonly SESSION_KEY = 'zkfold-smart-wallet'
@@ -15,7 +18,7 @@ export class Session {
     return smartWallet.oauth_state ?? null
   }
 
-  private getSession(): SmartWalletSession {
+  private getSession(): SessionI {
     const stored = sessionStorage.getItem(this.SESSION_KEY)
     if (stored) {
         const session = deserialize(stored);
@@ -25,7 +28,7 @@ export class Session {
     }
 
     // Initialize empty session if it doesn't exist or is corrupted
-    const defaultStorage: SmartWalletSession = { oauth_state: null }
+    const defaultStorage: SessionI = { oauth_state: null }
     sessionStorage.setItem(this.SESSION_KEY, serialize(defaultStorage))
     return defaultStorage
   }

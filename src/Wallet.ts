@@ -1,6 +1,6 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import { Backend } from './Backend';
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes } from './Types';
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, WalletInitialiser } from './Types';
 import { Prover } from './Prover';
 import { hexToBytes } from './Utils';
 
@@ -10,17 +10,6 @@ import { hexToBytes } from './Utils';
 export enum AddressType {
     Bech32 = 0,
     Email = 1
-}
-
-/**
- * Data required to initialise a wallet.
- * 
- *  data is Google JSON Web Token as a string
- *  rootKey is the private key to sign transactions (can be generated randomly)
- */
-export interface WalletInitialiser {
-    jwt: string;
-    tokenSKey?: string;
 }
 
 /**

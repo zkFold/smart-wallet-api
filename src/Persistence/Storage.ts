@@ -1,6 +1,11 @@
 import { deserialize, serialize } from '../JSON'
-import { SmartWalletStorage } from '../Types'
-import { WalletInitialiser } from '../Wallet'
+import { Version, WalletInitialiser } from '../Types'
+
+interface StorageI {
+    version: Version
+    // Activated wallets
+    wallets: { [addr: string]: WalletInitialiser }
+}
 
 export class Storage {
   private readonly STORAGE_KEY = 'zkfold-smart-wallet'
@@ -16,7 +21,7 @@ export class Storage {
     return smartWallet.wallets[addr] ?? null
   }
 
-  private getStorage(): SmartWalletStorage {
+  private getStorage(): StorageI {
     const stored = localStorage.getItem(this.STORAGE_KEY)
     if (stored) {
         const storage = deserialize(stored);
@@ -26,7 +31,7 @@ export class Storage {
     }
 
     // Initialize empty storage if it doesn't exist or is corrupted
-    const defaultStorage: SmartWalletStorage = { version: 'v0', wallets: {} }
+    const defaultStorage: StorageI = { version: 'v0', wallets: {} }
     localStorage.setItem(this.STORAGE_KEY, serialize(defaultStorage))
     return defaultStorage
   }
