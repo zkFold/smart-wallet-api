@@ -34,7 +34,7 @@ export class Prover {
      * @async
      * @returns {BackendKey[]}
      */
-    async serverKeys(): Promise<BackendKey[]> {
+    public async serverKeys(): Promise<BackendKey[]> {
         const { data } = await axios.get(`${this.url}/v0/keys`, this.headers());
         console.log(data);
         return parseBackendKeys(data);
@@ -47,7 +47,7 @@ export class Prover {
      * @param {ProofInput} inputs for the expMod circuit: exponent, modulus, signature and token name
      * @returns {string} proof request ID
      */
-    async requestProof(proofInput: ProofInput): Promise<string> {
+    public async requestProof(proofInput: ProofInput): Promise<string> {
         const keys = await this.serverKeys();
 
         //TODO: choose the freshest one if we end up implementing key rotation
@@ -101,7 +101,7 @@ export class Prover {
      * @param {string} Proof request ID 
      * @returns {ProofBytes | string} ProofBytes if the proof has finished or 'Pending' otherwise
      */
-    async proofStatus(proofId: string): Promise<ProofBytes | string> {
+    public async proofStatus(proofId: string): Promise<ProofBytes | string> {
         const { data } = await axios.post(`${this.url}/v0/proof-status`, proofId,
             // to prevent Axios from parsing the result and messing with numbers
             { ...this.headers({ "Content-Type": "application/json" }), ...{ responseType: 'text' } }
@@ -115,7 +115,7 @@ export class Prover {
      * @param {ProofInput} inputs for the expMod circuit: exponent, modulus, signature and token name
      * @returns {ProofBytes} ZK proof bytes for the expMod circuit 
      */
-    async prove(proofInput: ProofInput): Promise<ProofBytes> {
+    public async prove(proofInput: ProofInput): Promise<ProofBytes> {
         const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
         const proofId = await this.requestProof(proofInput);
 

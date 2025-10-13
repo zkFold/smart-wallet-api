@@ -1,6 +1,6 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import { Backend } from './Backend';
-import { UTxO, Output, BigIntWrap, SubmitTxResult } from './Types';
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes } from './Types';
 import { Prover } from './Prover';
 import { hexToBytes } from './Utils';
 
@@ -55,7 +55,8 @@ export class Wallet {
     private jwt!: string;
     private tokenSKey!: CSL.Bip32PrivateKey;
     private userId!: string;
-    private freshKey: boolean = false;
+    private activated: Boolean = false;
+    private proof: ProofBytes | null = null;
 
     private backend: Backend;
     private prover: Prover;
@@ -85,21 +86,47 @@ export class Wallet {
                 .derive(0)
                 .derive(0);
             this.tokenSKey = prvKey;
-            this.freshKey = true;
         } else {
             this.tokenSKey = CSL.Bip32PrivateKey.from_hex(initialiser.tokenSKey);
+            this.activated = true;
         }
     }
 
-    getEmail(): string {
+    public async getProof(): Promise<void> {
+        const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex();
+        const parts = this.jwt.split(".");
+        const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'));
+
+        const keyId = JSON.parse(header).kid;
+        const matchingKey = await getMatchingKey(keyId);
+        const signature = parts[2].replace(/-/g, '+').replace(/_/g, '/');
+        const empi = {
+            piPubE: b64ToBn(matchingKey.e.replace(/-/g, '+').replace(/_/g, '/')),
+            piPubN: b64ToBn(matchingKey.n.replace(/-/g, '+').replace(/_/g, '/')),
+            piSignature: b64ToBn(signature),
+            piTokenName: new BigIntWrap("0x" + pubkeyHex)
+        };
+
+        this.proof = await this.prover.prove(empi);   
+    }
+
+    public getUserId(): string {
         return this.userId;
+    }
+
+    public updateBackend(backend: Backend) {
+        this.backend = backend;
+    }
+
+    public updateProver(prover: Prover) {
+        this.prover = prover;
     }
 
     /**
      * @async
      * Get the Cardano address for a gmail address
      */
-    async addressForGmail(gmail: string): Promise<CSL.Address> {
+    public async addressForGmail(gmail: string): Promise<CSL.Address> {
         return await this.backend.walletAddress(gmail);
     }
 
@@ -107,7 +134,7 @@ export class Wallet {
      * @async
      * Get the Wallet's address
      */
-    async getAddress(): Promise<CSL.Address> {
+    public async getAddress(): Promise<CSL.Address> {
         return await this.addressForGmail(this.userId);
     }
 
@@ -115,7 +142,7 @@ export class Wallet {
      * @async
      * Get wallet's balance as an object with asset names as property names and amounts as their values.
      */
-    async getBalance(): Promise<Asset> {
+    public async getBalance(): Promise<Asset> {
         const utxos = await this.getUtxos();
         const assets: Asset = {};
         for (let i = 0; i < utxos.length; i++) {
@@ -132,7 +159,7 @@ export class Wallet {
     /**
      * Get extensions turned on in the wallet
      */
-    getExtensions(): string[] {
+    public getExtensions(): string[] {
         return [];
     }
 
@@ -140,7 +167,7 @@ export class Wallet {
      * @async
      * Get UTxOs held by the wallet 
      */
-    async getUtxos(): Promise<UTxO[]> {
+    public async getUtxos(): Promise<UTxO[]> {
         const address = await this.getAddress();
         let utxos: UTxO[] = [];
         try {
@@ -157,7 +184,7 @@ export class Wallet {
      * @async
      * Get wallet's used addresses (currently only wallet's main address) 
      */
-    async getUsedAddresses(): Promise<CSL.Address[]> {
+    public async getUsedAddresses(): Promise<CSL.Address[]> {
         const utxos = await this.getUtxos();
         const address = await this.getAddress();
         if (utxos.length == 0) {
@@ -171,7 +198,7 @@ export class Wallet {
      * @async
      * Get wallet's unused addresses 
      */
-    async getUnusedAddresses(): Promise<CSL.Address[]> {
+    public async getUnusedAddresses(): Promise<CSL.Address[]> {
         const utxos = await this.getUtxos();
         const address = await this.getAddress();
         if (utxos.length == 0) {
@@ -185,7 +212,7 @@ export class Wallet {
      * @async
      * Get wallet's reward addresses (currently none) 
      */
-    async getRewardAddresses(): Promise<CSL.Address[]> {
+    public async getRewardAddresses(): Promise<CSL.Address[]> {
         return [];
     }
 
@@ -193,7 +220,7 @@ export class Wallet {
      * @async
      * Get wallet's change address (currently wallet's main address) 
      */
-    async getChangeAddress(): Promise<CSL.Address> {
+    public async getChangeAddress(): Promise<CSL.Address> {
         return await this.getAddress();
     }
 
@@ -203,7 +230,7 @@ export class Wallet {
      * @async
      * @param {SmartTxRecipient} rec - A recipient with a Cardano or a email address
      */
-    async sendTo(rec: SmartTxRecipient): Promise<SubmitTxResult> {
+    public async sendTo(rec: SmartTxRecipient): Promise<SubmitTxResult> {
         console.log(rec.recipientType);
         console.log(rec.address);
         console.log(rec.assets);
@@ -225,7 +252,7 @@ export class Wallet {
         let txHex;
         const outs: Output[] = [{ address: recipientAddress.to_bech32(), value: rec.assets }];
 
-        if (!this.freshKey) {
+        if (this.activated) {
             const resp = await this.backend.sendFunds(this.userId, outs, this.tokenSKey.to_public().to_raw_key().hash().to_hex());
             txHex = resp.transaction;
         } else {
@@ -233,29 +260,22 @@ export class Wallet {
             const parts = this.jwt.split(".");
             const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'));
             const payload = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-
-            const keyId = JSON.parse(header).kid;
-            const matchingKey = await getMatchingKey(keyId);
-            const signature = parts[2].replace(/-/g, '+').replace(/_/g, '/');
-            const empi = {
-                piPubE: b64ToBn(matchingKey.e.replace(/-/g, '+').replace(/_/g, '/')),
-                piPubN: b64ToBn(matchingKey.n.replace(/-/g, '+').replace(/_/g, '/')),
-                piSignature: b64ToBn(signature),
-                piTokenName: new BigIntWrap("0x" + pubkeyHex)
-            };
-
-            const proofBytes = await this.prover.prove(empi);
-            const resp = await this.backend.activateAndSendFunds(header + '.' + payload, pubkeyHex, proofBytes, outs);
+            if (!this.proof) {
+                await this.getProof();
+            }
+            const resp = await this.backend.activateAndSendFunds(header + '.' + payload, pubkeyHex, this.proof as ProofBytes, outs);
             txHex = resp.transaction;
-            this.freshKey = false;
+            
         }
         const transaction = CSL.FixedTransaction.from_bytes(hexToBytes(txHex));
         transaction.sign_and_add_vkey_signature(this.tokenSKey.to_raw_key());
         const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('');
 
-        return await this.backend.submitTx(signedTxHex, emailRecipients);
-    }
+        const submitTxResult = await this.backend.submitTx(signedTxHex, emailRecipients);
+        this.activated = true;
 
+        return submitTxResult;
+    }
 }
 
 function harden(num: number): number {
