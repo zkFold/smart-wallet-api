@@ -1,14 +1,15 @@
+
 # zkFold Smart Wallet API
 
-This package provides a Smart Wallet API to manage Google OAuth-based wallets. In this wallet, funds are locked in a smart contract that verifies Google's signatures of a successful user login.
+This SDK lets you integrate zkFold Smart Wallets into your Cardano wallet or dApp. Smart Wallets are backed by Google OAuth: funds are locked in a script that only unlocks when the user proves possession of a valid Google-issued JWT.
 
 ## Installation
 
-The package is published on npm:
+The package is available on npm:
 
 https://www.npmjs.com/package/zkfold-smart-wallet-api
 
-You can install it by executing
+Install it with:
 
 ```bash
 npm install zkfold-smart-wallet-api
@@ -16,137 +17,152 @@ npm install zkfold-smart-wallet-api
 
 ## Development
 
-To build the library from sources, use
+To build the library from sources:
+
 ```bash
 npm install
 npm run build
 ```
 
-## API Reference
+## Quick start
 
-### Wallet
+The flow below shows how to obtain Google OAuth credentials, initialise a wallet, and prepare the background proof required for first-time spending.
 
-The Wallet class provides the usual CIP-30 wallet API:
-* **getAddress()**: Returns Wallet's address  
-* **getBalance()**: Returns Wallet's balance in format { token_name: amount }
-* **getExtensions()**: Returns the list of enabled extensions
-* **getUtxos()**: Returns the list of UTxO held by the wallet
-* **getUsedAddresses()**: Returns used addresses (normally one address if has transactions)
-* **getUnusedAddresses()**: Returns unused addresses (normally one address if no transactions)
-* **getRewardAddresses()**: Currently returns an empty list
-* **getChangeAddress()**: The same as getAddress()
-
-In addition, it provides the following Smart Wallet APIs:
-* **addressForGmail(email: string)**: Returns a Cardano address for the given Gmail-based email address
-* **sendTo(rec: SmartTxRecipient)**: Send funds to a Cardano address or Gmail-based email address
-
-### Backend
-Provides high-level functions to perform API requests to the backend.
-
-### Prover
-Provides high-level functions to perform API requests to the prover.
-
-### GoogleApi
-Provides OAuth 2.0 authorization code flow authentication for Gmail-based wallets:
-```javascript
-const gapi = new GoogleApi("your-client-id", "your-client-secret", "redirect-url");
-const authUrl = gapi.getAuthUrl("state");
-// User redirected to Google, then back with code in URL parameters
-const jwt = await gapi.getJWT(code);
-```
-
-### JSON Serialization
-Provides utilities for serializing and deserializing objects from this library:
-* **serialize(data: any)**: Serializes data to JSON string
-* **deserialize(jsonString: string)**: Deserializes JSON string back to JavaScript objects
-
-
-## Usage Example
-
-### Step 1: Initiating Google OAuth flow
-
-This step sets up the Google OAuth flow, which is required to create a Smart Wallet instance.
+### 1. Initiate the Google OAuth flow
 
 ```typescript
-import { GoogleApi, Backend, Prover } from 'zkfold-smart-wallet-api';
+import { Backend, GoogleApi } from 'zkfold-smart-wallet-api';
 
-// Get OAuth credentials from backend
+// Optionally pass an API key as the second argument if your backend requires it
 const backend = new Backend('https://wallet-api.zkfold.io', 'your-api-key');
-const credentials = await backend.credentials('your-client-name');
+const credentials = await backend.credentials();
 
-// Setup Google OAuth
 const gapi = new GoogleApi(
     credentials.client_id,
     credentials.client_secret,
-    "https://your-app.com/oauth/callback"
+    'https://your-app.com/oauth/callback'
 );
 
-// Redirect to Google
 const authUrl = gapi.getAuthUrl('random-state');
 window.location.href = authUrl;
 ```
 
-### Step 2: Handling OAuth callback
-
-After the user completes the Google OAuth, they will be redirected back to your application with an authorization code. This step shows how to exchange that code for a JWT token and create a Smart Wallet instance.
+### 2. Handle the OAuth callback and create a wallet
 
 ```typescript
-import { GoogleApi, Wallet } from 'zkfold-smart-wallet-api';
+import { Prover, Wallet } from 'zkfold-smart-wallet-api';
 
-// Extract authorization code from URL
-const urlParams = new URLSearchParams(window.location.search);
-const code = urlParams.get('code');
+const params = new URLSearchParams(window.location.search);
+const code = params.get('code');
+if (!code) throw new Error('Missing OAuth code');
 
-// Exchange code for JWT
 const jwt = await gapi.getJWT(code);
+if (!jwt) throw new Error('JWT exchange failed');
 
-// Initialize prover
 const prover = new Prover('https://wallet-prover.zkfold.io');
+const wallet = new Wallet(backend, prover, { jwt });
+```
 
-// Create wallet
-const wallet = new Wallet(
-    backend,
-    prover,
-    { jwt: jwt }
+If you need to persist the wallet between sessions, serialise the initialiser:
+
+```typescript
+localStorage.setItem('wallet-init', JSON.stringify(wallet.toWalletInitialiser()));
+```
+
+### 3. Kick off background proof generation (new in this release)
+
+When a wallet is activated for the first time, it must submit a zero-knowledge proof before funds can be sent. Generating the proof can take a while, so start it as soon as the wallet is created:
+
+```typescript
+// Fire-and-forget: the proof will be cached on the wallet instance
+wallet.getProof();
+```
+
+`Wallet.sendTo` will wait until the proof is ready, but precomputing it keeps the UI responsive.
+
+### 4. Query wallet data
+
+```typescript
+const email = wallet.getUserId();
+const address = await wallet.getAddress();
+const balance = await wallet.getBalance();
+const utxos = await wallet.getUtxos();
+```
+
+### 5. Send funds
+
+```typescript
+import { AddressType, BigIntWrap, SmartTxRecipient } from 'zkfold-smart-wallet-api';
+
+// Send to another smart wallet user
+await wallet.sendTo(
+    new SmartTxRecipient(AddressType.Email, 'recipient@gmail.com', {
+        lovelace: new BigIntWrap('2000000')
+    })
+);
+
+// Send to a regular Cardano address
+await wallet.sendTo(
+    new SmartTxRecipient(AddressType.Bech32, 'addr_test1qr...', {
+        lovelace: new BigIntWrap('1500000')
+    })
 );
 ```
 
-### Step 3: Querying user information
+`sendTo` returns a `{ transaction_id, notifier_errors }` object mirroring the backend response.
 
-Once you have a wallet instance, you can query various information about the user's account, including their email, Cardano address, and current balance.
+## API reference
 
-```typescript
-import { Wallet } from 'zkfold-smart-wallet-api';
+### Wallet
 
-// Get the user's email
-const email = wallet.getEmail();
+- `constructor(backend, prover, { jwt, tokenSKey? })`
+- `getUserId()` – Gmail address extracted from the JWT
+- `getAddress()` – Smart wallet bech32 address
+- `addressForGmail(email)` – Resolve another wallet’s address
+- `getBalance()` – Aggregate assets across all UTxOs
+- `getUtxos()` – Fetch UTxOs from the backend
+- `getUsedAddresses() / getUnusedAddresses() / getRewardAddresses()` – CIP-30 compatible helpers
+- `getChangeAddress()` – Currently returns the main address
+- `getExtensions()` – Returns enabled wallet extensions (empty array for now)
+- `getProof()` – Start/await the activation proof generation (new)
+- `sendTo(recipient)` – Build, sign, and submit a transaction. If the wallet isn’t activated yet it will include activation + payment in one transaction.
+- `toWalletInitialiser()` – Serialise the wallet so it can be restored later.
 
-// Get the user's Cardano address
-const address = await wallet.getAddress();
+### Backend
 
-// Get the user's balance
-const balance = await wallet.getBalance();
+High-level wrapper around the Smart Wallet backend API:
 
-```
+- `walletAddress(email)` – Resolve an address without activating the wallet
+- `getSettings()` – Fetch network and version info
+- `activateWallet(jwt, paymentKeyHash, proof)` – Build an activation transaction
+- `activateAndSendFunds(jwt, paymentKeyHash, proof, outs)` – Combine activation and payment
+- `sendFunds(email, outs, paymentKeyHash)` – Spend from an already activated wallet
+- `submitTx(transaction, emailRecipients?)` – Submit a signed CBOR transaction
+- `addVkeyAndSubmit(unsignedTx, vkeyWitness, emailRecipients?)` – Backend signs and submits on your behalf
+- `addressUtxo(address)` – Pull UTxOs for any address
+- `credentials()` – Retrieve Google OAuth client credentials (requires backend configuration)
 
-### Step 4: Making payments
+All mutating endpoints accept an optional API key supplied via the constructor.
 
-The smart wallet supports sending funds to both email addresses (other Smart Wallets) and traditional Cardano addresses.
+### Prover
 
-```typescript
-import { Wallet, SmartTxRecipient, AddressType, BigIntWrap } from 'zkfold-smart-wallet-api';
+Used to fetch zero-knowledge proofs for Google JWT validation:
 
-// Send to email address
-await wallet.sendTo(new SmartTxRecipient(
-    AddressType.Email, 
-    "recipient@gmail.com",
-    { lovelace: new BigIntWrap(2000000) }
-));
+- `requestProof(proofInput)` – Submit proof computation and get a request ID
+- `proofStatus(proofId)` – Poll for proof completion
+- `prove(proofInput)` – Convenience helper that internally polls until the proof is ready
 
-// Send to Cardano address
-await wallet.sendTo(new SmartTxRecipient(
-    AddressType.Bech32, 
-    "addr_test1qr...",
-    { lovelace: new BigIntWrap(1500000) }
-));
-```
+### GoogleApi
+
+- `getAuthUrl(state)` – Start the OAuth 2.0 authorization code flow
+- `getJWT(code)` – Exchange the authorization code for an ID token (JWT)
+
+### Serialization helpers
+
+The `JSON` module exposes `serialize`/`deserialize` for lossless (de)serialisation of types that contain `BigIntWrap` instances. `Types.ts` exports all shared data structures such as `BigIntWrap`, `SmartTxRecipient`, `ProofBytes`, and response DTOs.
+
+## Notes
+
+- For browser builds, ensure `@emurgo/cardano-serialization-lib-browser` is available.
+- Proof generation relies on HTTPS access to Google’s JWKS (`https://www.googleapis.com/oauth2/v3/certs`).
+- When precomputing proofs, run `wallet.getProof()` once per fresh JWT; reuse `toWalletInitialiser()` afterwards to skip regeneration.
