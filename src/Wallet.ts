@@ -92,6 +92,13 @@ export class Wallet {
         }
     }
 
+    public toWalletInitialiser(): WalletInitialiser {
+        return {
+            jwt: this.jwt,
+            tokenSKey: this.tokenSKey.to_hex()
+        }
+    }
+
     public async getProof(): Promise<void> {
         const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex();
         const parts = this.jwt.split(".");
@@ -112,14 +119,6 @@ export class Wallet {
 
     public getUserId(): string {
         return this.userId;
-    }
-
-    public updateBackend(backend: Backend) {
-        this.backend = backend;
-    }
-
-    public updateProver(prover: Prover) {
-        this.prover = prover;
     }
 
     /**
