@@ -69,7 +69,7 @@ If you need to persist the wallet between sessions, serialise the initialiser:
 localStorage.setItem('wallet-init', JSON.stringify(wallet.toWalletInitialiser()));
 ```
 
-### 3. Kick off background proof generation (new in this release)
+### 3. Kick off background proof generation
 
 When a wallet is activated for the first time, it must submit a zero-knowledge proof before funds can be sent. Generating the proof can take a while, so start it as soon as the wallet is created:
 
