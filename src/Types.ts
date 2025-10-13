@@ -266,10 +266,14 @@ export interface ClientCredentials {
     client_secret: string
 }
 
-export type StorageVersion = 'v0'
+export type Version = 'v0'
 
 export interface SmartWalletStorage {
-    version: StorageVersion,
+    version: Version
     // Activated wallets
     wallets: { [addr: string]: WalletInitialiser }
+}
+
+export interface SmartWalletSession {
+    oauth_state: string | null
 }
