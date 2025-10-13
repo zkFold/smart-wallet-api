@@ -1,76 +1,33 @@
 import { deserialize, serialize } from '../JSON'
-import { MultiWalletStorage } from '../Types'
+import { SmartWalletStorage } from '../Types'
 import { WalletInitialiser } from '../Wallet'
 
 export class Storage {
-  private readonly MULTI_WALLET_KEY = 'smart-wallets'
-  private readonly SESSION_KEY = 'smart-wallet-session'
+  private readonly SMART_WALLET_STORAGE_KEY = 'zkfold-smart-wallet'
 
-  // Multi-wallet support with persistent credentials
   public saveWallet(addr: string, wallet: WalletInitialiser): void {
-    try {
-      const multiWallet = this.getMultiWalletStorage()
-      multiWallet.wallets[addr] = wallet
-      localStorage.setItem(this.MULTI_WALLET_KEY, serialize(multiWallet))
-    } catch (error) {
-      console.warn('Failed to save wallet to localStorage:', error)
-    }
+    const smartWallet = this.getSmartWalletStorage()
+    smartWallet.wallets[addr] = wallet
+    localStorage.setItem(this.SMART_WALLET_STORAGE_KEY, serialize(smartWallet))
   }
 
   public getWallet(addr: string): WalletInitialiser | null {
-    try {
-      const multiWallet = this.getMultiWalletStorage()
-      return multiWallet.wallets[addr] || null
-    } catch (error) {
-      console.warn('Failed to retrieve wallet from localStorage:', error)
-      return null
-    }
+    const smartWallet = this.getSmartWalletStorage()
+    return smartWallet.wallets[addr] ?? null
   }
 
-  public getAllWallets(): WalletInitialiser[] {
-    try {
-      const multiWallet = this.getMultiWalletStorage()
-      return Object.values(multiWallet.wallets)
-    } catch (error) {
-      console.warn('Failed to retrieve wallets from localStorage:', error)
-      return []
+  private getSmartWalletStorage(): SmartWalletStorage {
+    const stored = localStorage.getItem(this.SMART_WALLET_STORAGE_KEY)
+    if (stored) {
+        const storage = deserialize(stored);
+        if (storage) {
+            return storage
+        }
     }
-  }
 
-  public removeWallet(addr: string): void {
-    try {
-      const multiWallet = this.getMultiWalletStorage()
-      delete multiWallet.wallets[addr]
-      localStorage.setItem(this.MULTI_WALLET_KEY, serialize(multiWallet))
-    } catch (error) {
-      console.warn('Failed to remove wallet from localStorage:', error)
-    }
-  }
-
-  public removeAllWallets(): void {
-    try {
-      localStorage.removeItem(this.MULTI_WALLET_KEY)
-    } catch (error) {
-      console.warn('Failed to remove all wallets from localStorage:', error)
-    }
-  }
-
-  private getMultiWalletStorage(): MultiWalletStorage {
-    try {
-      const stored = localStorage.getItem(this.MULTI_WALLET_KEY)
-      if (stored) {
-        return deserialize(stored)
-      } else {
-        // Initialize empty storage if it doesn't exist
-        const defaultStorage: MultiWalletStorage = { wallets: {} }
-        localStorage.setItem(this.MULTI_WALLET_KEY, serialize(defaultStorage))
-        return defaultStorage
-      }
-    } catch (error) {
-      console.warn('Failed to parse multi-wallet storage:', error)
-      const defaultStorage: MultiWalletStorage = { wallets: {} }
-      localStorage.setItem(this.MULTI_WALLET_KEY, serialize(defaultStorage))
-      return defaultStorage
-    }
+    // Initialize empty storage if it doesn't exist or is corrupted
+    const defaultStorage: SmartWalletStorage = { version: 'v0', wallets: {} }
+    localStorage.setItem(this.SMART_WALLET_STORAGE_KEY, serialize(defaultStorage))
+    return defaultStorage
   }
 }

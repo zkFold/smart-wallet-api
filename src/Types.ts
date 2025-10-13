@@ -266,7 +266,10 @@ export interface ClientCredentials {
     client_secret: string
 }
 
-// Activated wallets
-export interface MultiWalletStorage {
-  wallets: { [addr: string]: WalletInitialiser }
+export type StorageVersion = 'v0'
+
+export interface SmartWalletStorage {
+    version: StorageVersion,
+    // Activated wallets
+    wallets: { [addr: string]: WalletInitialiser }
 }

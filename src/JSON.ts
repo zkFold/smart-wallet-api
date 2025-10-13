@@ -17,7 +17,12 @@ export function serialize(data: any): string {
 }
 
 export function deserialize(jsonString: string): any {
-    return JSONbigConfig.parse(jsonString)
+    try {
+        return JSONbigConfig.parse(jsonString)
+    } catch (error) {
+        console.error('Failed to parse JSON:', error)
+        return null
+    }
 }
 
 export function parseProofBytes(json: string): ProofBytes | null {
