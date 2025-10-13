@@ -1,4 +1,5 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
+import { WalletInitialiser } from './Wallet';
 
 /**
  * Wrapper for various integer types used in communication with the Backend, Prover, and CSL.
@@ -263,4 +264,9 @@ export interface ProofInput {
 export interface ClientCredentials {
     client_id: string,
     client_secret: string
+}
+
+// Activated wallets
+export interface MultiWalletStorage {
+  wallets: { [addr: string]: WalletInitialiser }
 }
