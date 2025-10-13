@@ -260,8 +260,9 @@ export class Wallet {
             const parts = this.jwt.split(".");
             const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'));
             const payload = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-            if (!this.proof) {
-                await this.getProof();
+            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+            while (!this.proof) {
+                await delay(5_000);
             }
             const resp = await this.backend.activateAndSendFunds(header + '.' + payload, pubkeyHex, this.proof as ProofBytes, outs);
             txHex = resp.transaction;
