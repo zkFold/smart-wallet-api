@@ -1,4 +1,4 @@
-import { serialize, deserialize } from '../JSON';
+import { serialize, deserialize } from '../JSON'
 
 interface SessionI {
     oauth_state: string | null
@@ -7,21 +7,27 @@ interface SessionI {
 export class Session {
   private readonly SESSION_KEY = 'zkfold-smart-wallet'
 
-  public saveSessionState(state: string): void {
-    const smartWallet = this.getSession()
-    smartWallet.oauth_state = state
-    sessionStorage.setItem(this.SESSION_KEY, serialize(smartWallet))
+  public saveState(state: string): void {
+    const session = this.getSession()
+    session.oauth_state = state
+    sessionStorage.setItem(this.SESSION_KEY, serialize(session))
   }
 
-  public getSessionState(): string | null {
-    const smartWallet = this.getSession()
-    return smartWallet.oauth_state ?? null
+  public getState(): string | null {
+    const session = this.getSession()
+    return session.oauth_state ?? null
+  }
+
+  public removeState(): void {
+    const session = this.getSession()
+    session.oauth_state = null
+    sessionStorage.setItem(this.SESSION_KEY, serialize(session))
   }
 
   private getSession(): SessionI {
     const stored = sessionStorage.getItem(this.SESSION_KEY)
     if (stored) {
-        const session = deserialize(stored);
+        const session = deserialize(stored)
         if (session) {
             return session
         }

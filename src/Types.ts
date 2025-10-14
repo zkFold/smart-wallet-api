@@ -14,6 +14,42 @@ export interface WalletInitialiser {
     tokenSKey?: string;
 }
 
+/** Events emitted by the Wallet object.
+ * 
+ *  'walletInitialized' - emitted when the wallet is successfully initialized
+ *  'proofComputationComplete' - emitted when ZK proof computation is complete
+ *  'transactionComplete' - emitted when a transaction is successfully completed
+ *  'transactionFailed' - emitted when a transaction fails
+ *  'walletLoggedOut' - emitted when the wallet is logged out
+ */
+export type WalletEvent =
+    'walletInitialized'
+  | 'proofComputationComplete'
+  | 'transactionComplete'
+  | 'transactionFailed'
+  | 'walletLoggedOut'
+
+/**
+ * We support Bech32 addresses and Gmail-locked smart contracts.
+ */
+export enum AddressType {
+    Bech32 = 0,
+    Email = 1
+}
+
+export interface TransactionRequest {
+    recipient: string
+    recipientType: AddressType
+    asset: string
+    amount: string
+}
+
+export interface TransactionResult {
+  txId: string
+  recipient: string
+  isProofComputing?: boolean
+}
+
 /**
  * Wrapper for various integer types used in communication with the Backend, Prover, and CSL.
  * Provides a JSON representation unavailable for bignum.

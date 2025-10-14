@@ -11,20 +11,20 @@ export class Storage {
   private readonly STORAGE_KEY = 'zkfold-smart-wallet'
 
   public saveWallet(addr: string, wallet: WalletInitialiser): void {
-    const smartWallet = this.getStorage()
-    smartWallet.wallets[addr] = wallet
-    localStorage.setItem(this.STORAGE_KEY, serialize(smartWallet))
+    const storage = this.getStorage()
+    storage.wallets[addr] = wallet
+    localStorage.setItem(this.STORAGE_KEY, serialize(storage))
   }
 
   public getWallet(addr: string): WalletInitialiser | null {
-    const smartWallet = this.getStorage()
-    return smartWallet.wallets[addr] ?? null
+    const storage = this.getStorage()
+    return storage.wallets[addr] ?? null
   }
 
   private getStorage(): StorageI {
     const stored = localStorage.getItem(this.STORAGE_KEY)
     if (stored) {
-        const storage = deserialize(stored);
+        const storage = deserialize(stored)
         if (storage) {
             return storage
         }

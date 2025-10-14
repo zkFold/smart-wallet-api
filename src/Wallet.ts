@@ -1,16 +1,11 @@
-import * as CSL from '@emurgo/cardano-serialization-lib-browser';
-import { Backend } from './Backend';
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, WalletInitialiser } from './Types';
-import { Prover } from './Prover';
-import { hexToBytes } from './Utils';
-
-/**
- * We support Bech32 addresses and Gmail-locked smart contracts.
- */
-export enum AddressType {
-    Bech32 = 0,
-    Email = 1
-}
+import * as CSL from '@emurgo/cardano-serialization-lib-browser'
+import { Backend } from './Backend'
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, WalletInitialiser, AddressType, TransactionRequest, TransactionResult } from './Types'
+import { Prover } from './Prover'
+import { hexToBytes } from './Utils'
+import { Storage } from './Service/Storage'
+import { Session } from './Service/Session'
+import { GoogleApi } from './GoogleToken'
 
 /**
  * Describes the recipient of ADA
@@ -19,14 +14,14 @@ export enum AddressType {
  * @property {Asset} assets               - A dictionary of assets to send. For ADA, use 'lovelace' as the key. For other assets, use the format '<PolicyID>.<AssetName>'
  */
 export class SmartTxRecipient {
-    recipientType: AddressType;
-    address: string;
-    assets: Asset;
+    recipientType: AddressType
+    address: string
+    assets: Asset
 
     constructor(recipientType: AddressType, address: string, assets: Asset) {
-        this.recipientType = recipientType;
-        this.address = address;
-        this.assets = assets;
+        this.recipientType = recipientType
+        this.address = address
+        this.assets = assets
     }
 }
 
@@ -34,54 +29,158 @@ export class SmartTxRecipient {
  * Describes assets and their amounts
  */
 export interface Asset {
-    [key: string]: BigIntWrap;
+    [key: string]: BigIntWrap
 }
 
 /**
  * The Wallet which can be initialised with an email address.
  */
-export class Wallet {
-    private jwt!: string;
-    private tokenSKey!: CSL.Bip32PrivateKey;
-    private userId!: string;
-    private activated: Boolean = false;
-    private proof: ProofBytes | null = null;
+export class Wallet extends EventTarget  {
+    private jwt?: string
+    private tokenSKey?: CSL.Bip32PrivateKey
+    private userId?: string
+    private activated: Boolean = false
+    private proof: ProofBytes | null = null
 
-    private backend: Backend;
-    private prover: Prover;
+    private storage: Storage
+    private session: Session
+    private googleApi: GoogleApi
+    private backend: Backend
+    private prover: Prover
 
     /**
      *  @param {Prover} prover                 - A Prover object for interaction with the prover
      *  @param {Backend} backend               - A Backend object for interaction with the backend
      *  @param {WalletInitialiser} initialiser - Data to initialise the wallet
      */
-    constructor(backend: Backend, prover: Prover, initialiser: WalletInitialiser) {
-        this.backend = backend;
-        this.prover = prover;
+    constructor(googleApi: GoogleApi, backend: Backend, prover: Prover) {
+        super()
+        this.storage = new Storage()
+        this.session = new Session()
+        this.googleApi = googleApi
+        this.backend = backend
+        this.prover = prover
+    }
 
-        // At this point, we assume that userId is a valid email accessible by the user (i.e. the user was able to complete Google authentication).
-        this.jwt = initialiser.jwt;
+    public login(): void {
+        // Generate state for OAuth flow
+        const array = new Uint8Array(32)
+        crypto.getRandomValues(array)
+        const state = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+        this.session.saveState(state)
 
-        const parts = this.jwt.split(".");
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-        this.userId = payload.email;
+        // Redirect to Google OAuth
+        const authUrl = this.googleApi.getAuthUrl(state)
+        window.location.href = authUrl
+    }
 
-        if (!initialiser.tokenSKey) {
-            const prvKey = CSL.Bip32PrivateKey
-                .generate_ed25519_bip32()
-                .derive(harden(1852)) // purpose
-                .derive(harden(1815)) // coin type
-                .derive(harden(0)) // account #0
-                .derive(0)
-                .derive(0);
-            this.tokenSKey = prvKey;
-        } else {
-            this.tokenSKey = CSL.Bip32PrivateKey.from_hex(initialiser.tokenSKey);
-            this.activated = true;
+    public isLoggedIn(): boolean {
+        return this.jwt !== undefined && this.tokenSKey !== undefined && this.userId !== undefined
+    }
+
+    public logout(): void {
+        this.jwt = undefined
+        this.tokenSKey = undefined
+        this.userId = undefined
+        this.activated = false
+        this.proof = null
+
+        // Clear any session data
+        sessionStorage.clear()
+
+        // Dispatch logout event
+        this.dispatchEvent(new Event('walletLoggedOut'))
+    }
+
+    public async oauthCallback(callbackData: string): Promise<void> {
+        try {
+            // Parse URL parameters to get authorization code
+            const params = new URLSearchParams(callbackData)
+            
+            const error = params.get('error')
+            if (error) {
+                throw new Error(`OAuth error: ${error}`)
+            }
+
+            const state = params.get('state')
+            const savedState = this.session.getState()
+            this.session.removeState()
+            if (state !== savedState) {
+                throw new Error('State mismatch. Possible CSRF attack')
+            }
+
+            const code = params.get('code')
+            if (!code) {
+                throw new Error('Missing authorization code')
+            }
+
+            // Get JWT token using authorization code (now async)
+            const jwt = await this.googleApi.getJWTFromCode(code)
+            if (!jwt) {
+                throw new Error('Failed to get JWT from authorization code')
+            }
+
+            this.userId = this.googleApi.getUserId(jwt)
+            const address = await this.backend.walletAddress(this.userId).then((x: any) => x.to_bech32())
+            
+            // Check if there is an existing wallet for the same Cardano address
+            const exitingWalletInit = this.storage.getWallet(address)
+            if (exitingWalletInit) {
+                // TODO: check if we have a UTxO with the token matching the existing wallet's tokenSKey
+
+                this.jwt = exitingWalletInit.jwt
+                this.tokenSKey = CSL.Bip32PrivateKey.from_hex(exitingWalletInit.tokenSKey as string)
+                this.activated = true
+            }
+            else {
+                this.jwt = jwt
+                const prvKey = CSL.Bip32PrivateKey
+                    .generate_ed25519_bip32()
+                    .derive(harden(1852)) // purpose
+                    .derive(harden(1815)) // coin type
+                    .derive(harden(0)) // account #0
+                    .derive(0)
+                    .derive(0)
+                this.tokenSKey = prvKey
+                this.activated = false
+                this.getProof()
+            }
+            this.userId = this.googleApi.getUserId(this.jwt)
+        } catch (error) {
+            console.error('OAuth callback failed:', error)
+            throw error
+        }
+
+        // Redirect to root address
+        window.history.replaceState({}, '', '/')
+
+        // Dispatch wallet initialised event
+        this.dispatchEvent(new Event('walletInitialized'))
+    }
+
+    public async checkTransactionStatus(txId: string, recipient: string): Promise<any> {
+        try {
+            const address = CSL.Address.from_bech32(recipient)
+            const utxos = await this.backend.addressUtxo(address)
+
+            for (const utxo of utxos) {
+                if ((utxo as any).ref.transaction_id === txId) {
+                    return { outcome: "success", data: utxo }
+                }
+            }
+
+            return { outcome: "pending" }
+        } catch (error) {
+            console.error('Failed to check transaction status:', error)
+            return { outcome: "failure", reason: error }
         }
     }
 
     public toWalletInitialiser(): WalletInitialiser {
+        if (!this.jwt || !this.tokenSKey) {
+            throw new Error('Wallet is not initialised')
+        }
+
         return {
             jwt: this.jwt,
             tokenSKey: this.tokenSKey.to_hex()
@@ -89,25 +188,32 @@ export class Wallet {
     }
 
     public async getProof(): Promise<void> {
-        const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex();
-        const parts = this.jwt.split(".");
-        const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'));
+        if (!this.jwt || !this.tokenSKey) {
+            throw new Error('Wallet is not initialised')
+        }
 
-        const keyId = JSON.parse(header).kid;
-        const matchingKey = await getMatchingKey(keyId);
-        const signature = parts[2].replace(/-/g, '+').replace(/_/g, '/');
+        const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex()
+        const parts = this.jwt.split(".")
+        const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'))
+
+        const keyId = JSON.parse(header).kid
+        const matchingKey = await getMatchingKey(keyId)
+        const signature = parts[2].replace(/-/g, '+').replace(/_/g, '/')
         const empi = {
             piPubE: b64ToBn(matchingKey.e.replace(/-/g, '+').replace(/_/g, '/')),
             piPubN: b64ToBn(matchingKey.n.replace(/-/g, '+').replace(/_/g, '/')),
             piSignature: b64ToBn(signature),
             piTokenName: new BigIntWrap("0x" + pubkeyHex)
-        };
+        }
 
-        this.proof = await this.prover.prove(empi);   
+        this.proof = await this.prover.prove(empi)
     }
 
     public getUserId(): string {
-        return this.userId;
+        if (!this.userId) {
+            throw new Error('Wallet is not initialised')
+        }
+        return this.userId
     }
 
     /**
@@ -115,7 +221,7 @@ export class Wallet {
      * Get the Cardano address for a gmail address
      */
     public async addressForGmail(gmail: string): Promise<CSL.Address> {
-        return await this.backend.walletAddress(gmail);
+        return await this.backend.walletAddress(gmail)
     }
 
     /**
@@ -123,7 +229,10 @@ export class Wallet {
      * Get the Wallet's address
      */
     public async getAddress(): Promise<CSL.Address> {
-        return await this.addressForGmail(this.userId);
+        if (!this.userId) {
+            throw new Error('Wallet is not initialised')
+        }
+        return await this.addressForGmail(this.userId)
     }
 
     /**
@@ -131,24 +240,24 @@ export class Wallet {
      * Get wallet's balance as an object with asset names as property names and amounts as their values.
      */
     public async getBalance(): Promise<Asset> {
-        const utxos = await this.getUtxos();
-        const assets: Asset = {};
+        const utxos = await this.getUtxos()
+        const assets: Asset = {}
         for (let i = 0; i < utxos.length; i++) {
             for (const key in utxos[i].value) {
                 if (!(key in assets)) {
-                    assets[key] = new BigIntWrap(0);
+                    assets[key] = new BigIntWrap(0)
                 }
-                assets[key].increase(utxos[i].value[key]);
+                assets[key].increase(utxos[i].value[key])
             }
-        };
-        return assets;
+        }
+        return assets
     }
 
     /**
      * Get extensions turned on in the wallet
      */
     public getExtensions(): string[] {
-        return [];
+        return []
     }
 
     /**
@@ -156,16 +265,16 @@ export class Wallet {
      * Get UTxOs held by the wallet 
      */
     public async getUtxos(): Promise<UTxO[]> {
-        const address = await this.getAddress();
-        let utxos: UTxO[] = [];
+        const address = await this.getAddress()
+        let utxos: UTxO[] = []
         try {
-            utxos = await this.backend.addressUtxo(address);
+            utxos = await this.backend.addressUtxo(address)
         } catch (err) {
-            console.log("getUtxos()");
-            console.log(err);
-            utxos = [];
+            console.log("getUtxos()")
+            console.log(err)
+            utxos = []
         }
-        return utxos;
+        return utxos
     }
 
     /**
@@ -173,12 +282,12 @@ export class Wallet {
      * Get wallet's used addresses (currently only wallet's main address) 
      */
     public async getUsedAddresses(): Promise<CSL.Address[]> {
-        const utxos = await this.getUtxos();
-        const address = await this.getAddress();
+        const utxos = await this.getUtxos()
+        const address = await this.getAddress()
         if (utxos.length == 0) {
-            return [];
+            return []
         } else {
-            return [address];
+            return [address]
         }
     }
 
@@ -187,12 +296,12 @@ export class Wallet {
      * Get wallet's unused addresses 
      */
     public async getUnusedAddresses(): Promise<CSL.Address[]> {
-        const utxos = await this.getUtxos();
-        const address = await this.getAddress();
+        const utxos = await this.getUtxos()
+        const address = await this.getAddress()
         if (utxos.length == 0) {
-            return [address];
+            return [address]
         } else {
-            return [];
+            return []
         }
     }
 
@@ -201,7 +310,7 @@ export class Wallet {
      * Get wallet's reward addresses (currently none) 
      */
     public async getRewardAddresses(): Promise<CSL.Address[]> {
-        return [];
+        return []
     }
 
     /**
@@ -209,7 +318,77 @@ export class Wallet {
      * Get wallet's change address (currently wallet's main address) 
      */
     public async getChangeAddress(): Promise<CSL.Address> {
-        return await this.getAddress();
+        return await this.getAddress()
+    }
+
+    public async sendTransaction(request: TransactionRequest): Promise<void> {
+        try {
+            if (!this.isLoggedIn()) {
+                throw new Error('There is no active wallet when sending transaction')
+            }
+
+            console.log(`Sending ${request.amount} ${request.asset} to ${request.recipient} using ${request.recipientType}`)
+
+            // Create asset dictionary
+            const assetDict: { [key: string]: BigIntWrap } = {}
+            assetDict[request.asset] = new BigIntWrap(request.amount)
+
+            // Create recipient
+            let recipient: SmartTxRecipient
+            switch (request.recipientType) {
+                case AddressType.Bech32:
+                    recipient = new SmartTxRecipient(AddressType.Bech32, request.recipient, assetDict)
+                    break
+                case AddressType.Email:
+                    recipient = new SmartTxRecipient(AddressType.Email, request.recipient, assetDict)
+                    break
+                default:
+                    throw new Error(`Unsupported recipient type: ${request.recipientType}`)
+            }
+
+            // Get recipient address for tracking
+            let recipientAddress: string
+            if (request.recipientType === AddressType.Email) {
+                recipientAddress = await this.addressForGmail(request.recipient).then((x: any) => x.to_bech32())
+            } else {
+                recipientAddress = request.recipient
+            }
+
+            // Navigate to success view immediately with proof computing state
+            const initialResult: TransactionResult = {
+                txId: 'Computing...', // Temporary value while computing
+                recipient: recipientAddress,
+                isProofComputing: true
+            }
+            this.dispatchEvent(new CustomEvent('transactionComplete', { detail: initialResult }))
+
+            // Send transaction (this includes the proof computation)
+            const txResponse = await this.sendTo(recipient)
+            const txId = txResponse.transaction_id;
+            const failedEmails = txResponse.notifier_errors;
+            console.log(`Transaction ID: ${txId}`)
+            if (failedEmails && failedEmails.length > 0) {
+                console.error('Notifier errors occurred:');
+                for (let i = 0; i < failedEmails.length; i++) {
+                    const failedNotification = failedEmails[i];
+                    console.error(`Failed to notify recipient ${failedNotification.email}: ${failedNotification.error}`);
+                }
+            }
+
+            // Emit proof computation complete event
+            const finalResult: TransactionResult = {
+                txId,
+                recipient: recipientAddress,
+                isProofComputing: false
+            }
+            this.storage.saveWallet(await this.getAddress().then((x: any) => x.to_bech32()), this.toWalletInitialiser())
+            this.dispatchEvent(new CustomEvent('proofComputationComplete', { detail: finalResult }))
+
+        } catch (error) {
+            console.error('Transaction failed:', error)
+            this.dispatchEvent(new CustomEvent('transactionFailed', { detail: error }))
+            throw error
+        }
     }
 
     /**
@@ -219,79 +398,82 @@ export class Wallet {
      * @param {SmartTxRecipient} rec - A recipient with a Cardano or a email address
      */
     public async sendTo(rec: SmartTxRecipient): Promise<SubmitTxResult> {
-        console.log(rec.recipientType);
-        console.log(rec.address);
-        console.log(rec.assets);
+        if (!this.userId || !this.tokenSKey || !this.jwt) {
+            throw new Error('Wallet is not initialised')
+        }
 
-        let recipientAddress;
+        console.log(rec.recipientType)
+        console.log(rec.address)
+        console.log(rec.assets)
+
+        let recipientAddress
 
         if (rec.recipientType == AddressType.Email) {
-            recipientAddress = await this.addressForGmail(rec.address);
+            recipientAddress = await this.addressForGmail(rec.address)
         } else {
-            recipientAddress = CSL.Address.from_bech32(rec.address);
+            recipientAddress = CSL.Address.from_bech32(rec.address)
         }
 
         // Prepare email recipients list
-        const emailRecipients: string[] = [];
+        const emailRecipients: string[] = []
         if (rec.recipientType == AddressType.Email) {
-            emailRecipients.push(rec.address);
+            emailRecipients.push(rec.address)
         }
 
-        let txHex;
-        const outs: Output[] = [{ address: recipientAddress.to_bech32(), value: rec.assets }];
+        let txHex
+        const outs: Output[] = [{ address: recipientAddress.to_bech32(), value: rec.assets }]
 
         if (this.activated) {
-            const resp = await this.backend.sendFunds(this.userId, outs, this.tokenSKey.to_public().to_raw_key().hash().to_hex());
-            txHex = resp.transaction;
+            const resp = await this.backend.sendFunds(this.userId, outs, this.tokenSKey.to_public().to_raw_key().hash().to_hex())
+            txHex = resp.transaction
         } else {
-            const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex();
-            const parts = this.jwt.split(".");
-            const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'));
-            const payload = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+            const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex()
+            const parts = this.jwt.split(".")
+            const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'))
+            const payload = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
             while (!this.proof) {
-                await delay(5_000);
+                await delay(5_000)
             }
-            const resp = await this.backend.activateAndSendFunds(header + '.' + payload, pubkeyHex, this.proof as ProofBytes, outs);
-            txHex = resp.transaction;
-            
+            const resp = await this.backend.activateAndSendFunds(header + '.' + payload, pubkeyHex, this.proof as ProofBytes, outs)
+            txHex = resp.transaction
+
         }
-        const transaction = CSL.FixedTransaction.from_bytes(hexToBytes(txHex));
-        transaction.sign_and_add_vkey_signature(this.tokenSKey.to_raw_key());
-        const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('');
+        const transaction = CSL.FixedTransaction.from_bytes(hexToBytes(txHex))
+        transaction.sign_and_add_vkey_signature(this.tokenSKey.to_raw_key())
+        const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('')
 
-        const submitTxResult = await this.backend.submitTx(signedTxHex, emailRecipients);
-        this.activated = true;
+        const submitTxResult = await this.backend.submitTx(signedTxHex, emailRecipients)
+        this.activated = true
 
-        return submitTxResult;
+        return submitTxResult
     }
 }
 
 function harden(num: number): number {
-    return 0x80000000 + num;
+    return 0x80000000 + num
 }
 
 async function getMatchingKey(keyId: string) {
-    const { keys } = await fetch('https://www.googleapis.com/oauth2/v3/certs').then((res) => res.json());
+    const { keys } = await fetch('https://www.googleapis.com/oauth2/v3/certs').then((res) => res.json())
     for (const k of keys) {
         if (k.kid == keyId) {
-            return k;
+            return k
         }
     }
-    return null;
+    return null
 }
-
 
 // https://coolaj86.com/articles/bigints-and-base64-in-javascript/
 function b64ToBn(b64: string): BigIntWrap {
-    const bin = atob(b64);
-    const hex: string[] = [];
+    const bin = atob(b64)
+    const hex: string[] = []
 
     bin.split('').forEach(function (ch) {
-        let h = ch.charCodeAt(0).toString(16);
-        if (h.length % 2) { h = '0' + h; }
-        hex.push(h);
-    });
+        let h = ch.charCodeAt(0).toString(16)
+        if (h.length % 2) { h = '0' + h }
+        hex.push(h)
+    })
 
-    return new BigIntWrap(BigInt('0x' + hex.join('')));
+    return new BigIntWrap(BigInt('0x' + hex.join('')))
 }
