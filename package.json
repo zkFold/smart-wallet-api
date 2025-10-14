@@ -1,6 +1,6 @@
 {
   "name": "zkfold-smart-wallet-api",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Smart Wallet API - Browser and extension compatible",
   "main": "dist/smart-wallet-api.es.js",
   "module": "dist/smart-wallet-api.es.js",

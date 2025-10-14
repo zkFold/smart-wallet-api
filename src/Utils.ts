@@ -1,3 +1,5 @@
+import { BigIntWrap } from "./Types";
+
 /**
  * Convert a hex string to a byte array
  * https://stackoverflow.com/questions/14603205/how-to-convert-hex-string-into-a-bytes-array-and-a-bytes-array-in-the-hex-strin
@@ -35,4 +37,22 @@ export function bigIntToBytes(bigInt: bigint): Uint8Array {
 export function bytesToBase64Url(bytes: Uint8Array): string {
     const base64 = btoa(String.fromCharCode(...bytes));
     return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+export function harden(num: number): number {
+    return 0x80000000 + num
+}
+
+// https://coolaj86.com/articles/bigints-and-base64-in-javascript/
+export function b64ToBn(b64: string): BigIntWrap {
+    const bin = atob(b64)
+    const hex: string[] = []
+
+    bin.split('').forEach(function (ch) {
+        let h = ch.charCodeAt(0).toString(16)
+        if (h.length % 2) { h = '0' + h }
+        hex.push(h)
+    })
+
+    return new BigIntWrap(BigInt('0x' + hex.join('')))
 }

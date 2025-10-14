@@ -1,7 +1,7 @@
 export class GoogleApi {
-    private clientId: string;
-    private clientSecret: string;
-    private redirectURL: string;
+    private clientId: string
+    private clientSecret: string
+    private redirectURL: string
 
     constructor(clientId: string, clientSecret: string, redirectURL: string) {
         /**
@@ -9,17 +9,17 @@ export class GoogleApi {
          * from the client_secret.json file. To get these credentials for your application, visit
          * https://console.cloud.google.com/apis/credentials.
          */
-        this.clientId = clientId;
-        this.clientSecret = clientSecret;
-        this.redirectURL = redirectURL;
+        this.clientId = clientId
+        this.clientSecret = clientSecret
+        this.redirectURL = redirectURL
     }
 
-    getAuthUrl(state: string): string {
+    public getAuthUrl(state: string): string {
         // Example access scopes for Web2 login: user email is used.
         const scopes = [
             'https://www.googleapis.com/auth/userinfo.email',
             'openid',
-        ];
+        ]
 
         const params = new URLSearchParams({
             client_id: this.clientId,
@@ -29,15 +29,15 @@ export class GoogleApi {
             access_type: 'offline',
             include_granted_scopes: 'true',
             state: state
-        });
+        })
 
-        const authorizationUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-        return authorizationUrl;
-    };
+        const authorizationUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
+        return authorizationUrl
+    }
 
-    async getJWT(code: string): Promise<string | undefined> {
+    public async getJWTFromCode(code: string): Promise<string | undefined> {
         try {
-            const tokenEndpoint = 'https://oauth2.googleapis.com/token';
+            const tokenEndpoint = 'https://oauth2.googleapis.com/token'
 
             const params = new URLSearchParams({
                 client_id: this.clientId,
@@ -45,7 +45,7 @@ export class GoogleApi {
                 code: code,
                 grant_type: 'authorization_code',
                 redirect_uri: this.redirectURL
-            });
+            })
 
             const response = await fetch(tokenEndpoint, {
                 method: 'POST',
@@ -53,17 +53,33 @@ export class GoogleApi {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
                 body: params.toString()
-            });
+            })
 
             if (!response.ok) {
-                throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`);
+                throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`)
             }
 
-            const tokens = await response.json();
-            console.info('Tokens acquired.');
-            return tokens.id_token;
+            const tokens = await response.json()
+            console.info('Tokens acquired.')
+            return tokens.id_token
         } catch (e) {
-            console.log(e);
+            console.log(e)
         }
+    }
+
+    public async getMatchingKey(keyId: string) {
+        const { keys } = await fetch('https://www.googleapis.com/oauth2/v3/certs').then((res) => res.json())
+        for (const k of keys) {
+            if (k.kid == keyId) {
+                return k
+            }
+        }
+        return null
+    }
+
+    public getUserId(jwt: string): string {
+        const parts = jwt.split(".")
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
+        return payload.email
     }
 }

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import forge from 'node-forge';
-import { ProofBytes, BackendKey, ProofInput } from './Types';
-import { serialize, parseBackendKeys, parseProofStatus } from './JSON';
+import { ProofBytes, ProverPublicKey, ProofInput } from '../Types';
+import { serialize, parseProverKeys, parseProofStatus } from '../JSON';
 
 
 /**
@@ -32,12 +32,12 @@ export class Prover {
     /**
      * Get all public keys held by the Prover 
      * @async
-     * @returns {BackendKey[]}
+     * @returns {ProverPublicKey[]}
      */
-    public async serverKeys(): Promise<BackendKey[]> {
+    public async serverKeys(): Promise<ProverPublicKey[]> {
         const { data } = await axios.get(`${this.url}/v0/keys`, this.headers());
         console.log(data);
-        return parseBackendKeys(data);
+        return parseProverKeys(data);
     }
 
 
@@ -50,7 +50,6 @@ export class Prover {
     public async requestProof(proofInput: ProofInput): Promise<string> {
         const keys = await this.serverKeys();
 
-        //TODO: choose the freshest one if we end up implementing key rotation
         const key = keys[0];
 
         const payload = serialize(proofInput);

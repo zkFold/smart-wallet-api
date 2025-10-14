@@ -3,7 +3,7 @@
  */
 
 import JSONbig from 'json-bigint'
-import { BigIntWrap, ProofBytes, BackendKey } from './Types';
+import { BigIntWrap, ProofBytes, ProverPublicKey } from './Types';
 
 
 // Configure JSONbig to handle BigInt values properly
@@ -17,7 +17,12 @@ export function serialize(data: any): string {
 }
 
 export function deserialize(jsonString: string): any {
-    return JSONbigConfig.parse(jsonString)
+    try {
+        return JSONbigConfig.parse(jsonString)
+    } catch (error) {
+        console.error('Failed to parse JSON:', error)
+        return null
+    }
 }
 
 export function parseProofBytes(json: string): ProofBytes | null {
@@ -71,7 +76,7 @@ export function parseProofBytes(json: string): ProofBytes | null {
     return wrapped;
 }
 
-export function parseBackendKeys(json: any[]): BackendKey[] {
+export function parseProverKeys(json: any[]): ProverPublicKey[] {
     const result = [];
     const arrayLength = json.length;
     for (let i = 0; i < arrayLength; i++) {
