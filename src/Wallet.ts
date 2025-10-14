@@ -1,36 +1,11 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
-import { Backend } from './Backend'
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, WalletInitialiser, AddressType, TransactionRequest, TransactionResult } from './Types'
-import { Prover } from './Prover'
-import { hexToBytes } from './Utils'
+import { Backend } from './Service/Backend'
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, WalletInitialiser, AddressType, TransactionRequest, TransactionResult, ProofInput, Asset, SmartTxRecipient } from './Types'
+import { Prover } from './Service/Prover'
+import { b64ToBn, harden, hexToBytes } from './Utils'
 import { Storage } from './Service/Storage'
 import { Session } from './Service/Session'
-import { GoogleApi } from './GoogleToken'
-
-/**
- * Describes the recipient of ADA
- * @property {AddressType} recipientType  - Type of wallet the recipient holds
- * @property {string} address             - Cardano address if recipientType is Bech32, email otherwise
- * @property {Asset} assets               - A dictionary of assets to send. For ADA, use 'lovelace' as the key. For other assets, use the format '<PolicyID>.<AssetName>'
- */
-export class SmartTxRecipient {
-    recipientType: AddressType
-    address: string
-    assets: Asset
-
-    constructor(recipientType: AddressType, address: string, assets: Asset) {
-        this.recipientType = recipientType
-        this.address = address
-        this.assets = assets
-    }
-}
-
-/**
- * Describes assets and their amounts
- */
-export interface Asset {
-    [key: string]: BigIntWrap
-}
+import { GoogleApi } from './Service/Google'
 
 /**
  * The Wallet which can be initialised with an email address.
@@ -197,9 +172,9 @@ export class Wallet extends EventTarget  {
         const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'))
 
         const keyId = JSON.parse(header).kid
-        const matchingKey = await getMatchingKey(keyId)
+        const matchingKey = await this.googleApi.getMatchingKey(keyId)
         const signature = parts[2].replace(/-/g, '+').replace(/_/g, '/')
-        const empi = {
+        const empi: ProofInput = {
             piPubE: b64ToBn(matchingKey.e.replace(/-/g, '+').replace(/_/g, '/')),
             piPubN: b64ToBn(matchingKey.n.replace(/-/g, '+').replace(/_/g, '/')),
             piSignature: b64ToBn(signature),
@@ -337,10 +312,10 @@ export class Wallet extends EventTarget  {
             let recipient: SmartTxRecipient
             switch (request.recipientType) {
                 case AddressType.Bech32:
-                    recipient = new SmartTxRecipient(AddressType.Bech32, request.recipient, assetDict)
+                    recipient = { recipientType: AddressType.Bech32, address: request.recipient, assets: assetDict }
                     break
                 case AddressType.Email:
-                    recipient = new SmartTxRecipient(AddressType.Email, request.recipient, assetDict)
+                    recipient = { recipientType: AddressType.Email, address: request.recipient, assets: assetDict }
                     break
                 default:
                     throw new Error(`Unsupported recipient type: ${request.recipientType}`)
@@ -448,32 +423,4 @@ export class Wallet extends EventTarget  {
 
         return submitTxResult
     }
-}
-
-function harden(num: number): number {
-    return 0x80000000 + num
-}
-
-async function getMatchingKey(keyId: string) {
-    const { keys } = await fetch('https://www.googleapis.com/oauth2/v3/certs').then((res) => res.json())
-    for (const k of keys) {
-        if (k.kid == keyId) {
-            return k
-        }
-    }
-    return null
-}
-
-// https://coolaj86.com/articles/bigints-and-base64-in-javascript/
-function b64ToBn(b64: string): BigIntWrap {
-    const bin = atob(b64)
-    const hex: string[] = []
-
-    bin.split('').forEach(function (ch) {
-        let h = ch.charCodeAt(0).toString(16)
-        if (h.length % 2) { h = '0' + h }
-        hex.push(h)
-    })
-
-    return new BigIntWrap(BigInt('0x' + hex.join('')))
 }

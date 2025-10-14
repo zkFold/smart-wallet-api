@@ -67,6 +67,16 @@ export class GoogleApi {
         }
     }
 
+    public async getMatchingKey(keyId: string) {
+        const { keys } = await fetch('https://www.googleapis.com/oauth2/v3/certs').then((res) => res.json())
+        for (const k of keys) {
+            if (k.kid == keyId) {
+                return k
+            }
+        }
+        return null
+    }
+
     public getUserId(jwt: string): string {
         const parts = jwt.split(".")
         const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))

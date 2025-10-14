@@ -1,7 +1,7 @@
 import axios from 'axios';
 import forge from 'node-forge';
-import { ProofBytes, ProverPublicKey, ProofInput } from './Types';
-import { serialize, parseProverKeys, parseProofStatus } from './JSON';
+import { ProofBytes, ProverPublicKey, ProofInput } from '../Types';
+import { serialize, parseProverKeys, parseProofStatus } from '../JSON';
 
 
 /**
@@ -50,7 +50,6 @@ export class Prover {
     public async requestProof(proofInput: ProofInput): Promise<string> {
         const keys = await this.serverKeys();
 
-        //TODO: choose the freshest one if we end up implementing key rotation
         const key = keys[0];
 
         const payload = serialize(proofInput);
