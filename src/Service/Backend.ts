@@ -35,6 +35,27 @@ export class Backend {
     }
 
     /**
+     * Get server settings including network and version information.
+     * @async
+     * @returns {Settings}
+     */
+    async getSettings(): Promise<{ network: string, version: string }> {
+        const { data } = await axios.get(`${this.url}/v0/settings`, this.headers());
+        return data;
+    }
+
+    /**
+     * Get Google OAuth credentials 
+     * @async
+     * @param {string} clientName 
+     * @returns {ClientCredentials}
+     */
+    async credentials(): Promise<ClientCredentials> {
+        const { data } = await axios.get(`${this.url}/v0/oauth/credentials`, this.headers());
+        return data;
+    }
+
+    /**
      * Return wallet's address by email. The wallet can be not initialised, i.e. this function will return the address for any email.
      * @async
      * @param {string} email
@@ -46,17 +67,7 @@ export class Backend {
         }, this.headers());
 
         return CSL.Address.from_bech32(data.address);
-    }
-
-    /**
-     * Get server settings including network and version information.
-     * @async
-     * @returns {Settings}
-     */
-    async getSettings(): Promise<{ network: string, version: string }> {
-        const { data } = await axios.get(`${this.url}/v0/settings`, this.headers());
-        return data;
-    }
+    }    
 
     /**
      * Activate a Smart Wallet.
@@ -182,7 +193,7 @@ export class Backend {
      * @param {string[]} email_recipients
      * @returns {SubmitTxResult} - Transaction ID and email delivery errors, if any
      */
-    async addVkeyAndSubmit(unsigned_transaction: string, vkey_witness: string, email_recipients: string[] = []): Promise<SubmitTxResult> {
+    async addVkeyAndSubmitTx(unsigned_transaction: string, vkey_witness: string, email_recipients: string[] = []): Promise<SubmitTxResult> {
         const { data } = await axios.post(`${this.url}/v0/tx/add-vkey-and-submit`, {
             unsigned_transaction: unsigned_transaction,
             vkey_witness: vkey_witness,
@@ -230,16 +241,4 @@ export class Backend {
 
         return result;
     }
-
-    /**
-     * Get Google OAuth credentials 
-     * @async
-     * @param {string} clientName 
-     * @returns {ClientCredentials}
-     */
-    async credentials(): Promise<ClientCredentials> {
-        const { data } = await axios.get(`${this.url}/v0/oauth/credentials`, this.headers());
-        return data;
-    }
-
 }

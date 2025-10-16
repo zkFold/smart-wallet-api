@@ -96,7 +96,7 @@ export class Wallet extends EventTarget  {
             }
 
             this.userId = this.googleApi.getUserId(jwt)
-            const address = await this.backend.walletAddress(this.userId).then((x: any) => x.to_bech32())
+            const address = await this.addressForGmail(this.userId).then((x: any) => x.to_bech32())
             
             // Check if there is an existing wallet for the same Cardano address
             const exitingWalletInit = this.storage.getWallet(address)
