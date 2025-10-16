@@ -1,4 +1,4 @@
-import { BigIntWrap } from "./Common";
+import { Value } from "./Cardano";
 
 // Smart Wallet version
 export type Version = 'v0'
@@ -51,13 +51,6 @@ export interface TransactionResult {
 }
 
 /**
- * Describes assets and their amounts
- */
-export interface Asset {
-    [key: string]: BigIntWrap
-}
-
-/**
  * Describes the recipient of ADA
  * @property {AddressType} recipientType  - Type of wallet the recipient holds
  * @property {string} address             - Cardano address if recipientType is Bech32, email otherwise
@@ -66,5 +59,5 @@ export interface Asset {
 export interface SmartTxRecipient {
     recipientType: AddressType
     address: string
-    assets: Asset
+    assets: Value
 }

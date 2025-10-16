@@ -1,6 +1,6 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, WalletInitialiser, AddressType, TransactionRequest, TransactionResult, ProofInput, Asset, SmartTxRecipient } from './Types'
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, WalletInitialiser, AddressType, TransactionRequest, TransactionResult, ProofInput, SmartTxRecipient, Value } from './Types'
 import { Prover } from './Service/Prover'
 import { b64ToBn, harden, hexToBytes } from './Utils'
 import { Storage } from './Service/Storage'
@@ -203,18 +203,18 @@ export class Wallet extends EventTarget  {
      * @async
      * Get wallet's balance as an object with asset names as property names and amounts as their values.
      */
-    public async getBalance(): Promise<Asset> {
+    public async getBalance(): Promise<Value> {
         const utxos = await this.getUtxos()
-        const assets: Asset = {}
+        const value: Value = {}
         for (let i = 0; i < utxos.length; i++) {
             for (const key in utxos[i].value) {
-                if (!(key in assets)) {
-                    assets[key] = new BigIntWrap(0)
+                if (!(key in value)) {
+                    value[key] = new BigIntWrap(0)
                 }
-                assets[key].increase(utxos[i].value[key])
+                value[key].increase(utxos[i].value[key])
             }
         }
-        return assets
+        return value
     }
 
     /**
