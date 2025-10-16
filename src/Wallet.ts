@@ -133,36 +133,7 @@ export class Wallet extends EventTarget  {
         this.dispatchEvent(new Event('walletInitialized'))
     }
 
-    public async checkTransactionStatus(txId: string, recipient: string): Promise<any> {
-        try {
-            const address = CSL.Address.from_bech32(recipient)
-            const utxos = await this.backend.addressUtxo(address)
-
-            for (const utxo of utxos) {
-                if ((utxo as any).ref.transaction_id === txId) {
-                    return { outcome: "success", data: utxo }
-                }
-            }
-
-            return { outcome: "pending" }
-        } catch (error) {
-            console.error('Failed to check transaction status:', error)
-            return { outcome: "failure", reason: error }
-        }
-    }
-
-    public toWalletInitialiser(): WalletInitialiser {
-        if (!this.jwt || !this.tokenSKey) {
-            throw new Error('Wallet is not initialised')
-        }
-
-        return {
-            jwt: this.jwt,
-            tokenSKey: this.tokenSKey.to_hex()
-        }
-    }
-
-    public async getProof(): Promise<void> {
+    private async getProof(): Promise<void> {
         if (!this.jwt || !this.tokenSKey) {
             throw new Error('Wallet is not initialised')
         }
@@ -182,6 +153,24 @@ export class Wallet extends EventTarget  {
         }
 
         this.proof = await this.prover.prove(empi)
+    }
+
+    public async checkTransactionStatus(txId: string, recipient: string): Promise<any> {
+        try {
+            const address = CSL.Address.from_bech32(recipient)
+            const utxos = await this.backend.addressUtxo(address)
+
+            for (const utxo of utxos) {
+                if ((utxo as any).ref.transaction_id === txId) {
+                    return { outcome: "success", data: utxo }
+                }
+            }
+
+            return { outcome: "pending" }
+        } catch (error) {
+            console.error('Failed to check transaction status:', error)
+            return { outcome: "failure", reason: error }
+        }
     }
 
     public getUserId(): string {
@@ -298,7 +287,7 @@ export class Wallet extends EventTarget  {
 
     public async sendTransaction(request: TransactionRequest): Promise<void> {
         try {
-            if (!this.isLoggedIn()) {
+            if (!this.jwt || !this.tokenSKey || !this.userId) {
                 throw new Error('There is no active wallet when sending transaction')
             }
 
@@ -356,7 +345,10 @@ export class Wallet extends EventTarget  {
                 recipient: recipientAddress,
                 isProofComputing: false
             }
-            this.storage.saveWallet(await this.getAddress().then((x: any) => x.to_bech32()), this.toWalletInitialiser())
+            this.storage.saveWallet(await this.getAddress().then((x: any) => x.to_bech32()), {
+                jwt: this.jwt,
+                tokenSKey: this.tokenSKey.to_hex()
+            })
             this.dispatchEvent(new CustomEvent('proofComputationComplete', { detail: finalResult }))
 
         } catch (error) {
