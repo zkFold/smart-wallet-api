@@ -10,8 +10,8 @@ export type Version = 'v0'
  *  rootKey is the private key to sign transactions (can be generated randomly)
  */
 export interface WalletInitialiser {
-    jwt: string;
-    tokenSKey?: string;
+    jwt: string
+    tokenSKey?: string
 }
 
 /** Events emitted by the Wallet object.
