@@ -8,8 +8,8 @@ import { BigIntWrap, ProofBytes, Output, Reference, UTxO, CreateWalletResponse, 
  * @class
  */
 export class Backend {
-    private url: string;
-    private secret: string | null;
+    private url: string
+    private secret: string | null
 
     /**
      * Creates a new Backend object.
@@ -17,8 +17,8 @@ export class Backend {
      * @param {string} secret  - optional Backend's secret (API key)
      */
     constructor(url: string, secret: string | null = null) {
-        this.url = url;
-        this.secret = secret;
+        this.url = url
+        this.secret = secret
     }
 
     private headers(additional: Record<string, string> = {}) {
@@ -29,9 +29,9 @@ export class Backend {
             headers: additional
         }
         if (this.secret) {
-            headers.headers['api-key'] = this.secret;
+            headers.headers['api-key'] = this.secret
         }
-        return headers;
+        return headers
     }
 
     /**
@@ -40,8 +40,8 @@ export class Backend {
      * @returns {Settings}
      */
     async getSettings(): Promise<{ network: string, version: string }> {
-        const { data } = await axios.get(`${this.url}/v0/settings`, this.headers());
-        return data;
+        const { data } = await axios.get(`${this.url}/v0/settings`, this.headers())
+        return data
     }
 
     /**
@@ -51,8 +51,8 @@ export class Backend {
      * @returns {ClientCredentials}
      */
     async credentials(): Promise<ClientCredentials> {
-        const { data } = await axios.get(`${this.url}/v0/oauth/credentials`, this.headers());
-        return data;
+        const { data } = await axios.get(`${this.url}/v0/oauth/credentials`, this.headers())
+        return data
     }
 
     /**
@@ -64,10 +64,10 @@ export class Backend {
     async walletAddress(email: string): Promise<CSL.Address> {
         const { data } = await axios.post(`${this.url}/v0/wallet/address`, {
             'email': email
-        }, this.headers());
+        }, this.headers())
 
-        return CSL.Address.from_bech32(data.address);
-    }    
+        return CSL.Address.from_bech32(data.address)
+    }
 
     /**
      * Activate a Smart Wallet.
@@ -83,22 +83,22 @@ export class Backend {
             'jwt': jwt,
             'payment_key_hash': payment_key_hash,
             'proof_bytes': proof_bytes
-        };
+        }
 
-        const payload = serialize(requestData);
+        const payload = serialize(requestData)
 
         const { data } = await axios.post(`${this.url}/v0/wallet/activate`, payload,
             this.headers({ 'Content-Type': 'application/json' })
-        );
+        )
 
         const response: CreateWalletResponse = {
             address: CSL.Address.from_bech32(data.address),
             transaction: data.transaction,
             transaction_fee: data.transaction_fee,
             transaction_id: data.transaction_id
-        };
+        }
 
-        return response;
+        return response
     }
 
     /**
@@ -117,22 +117,22 @@ export class Backend {
             'payment_key_hash': payment_key_hash,
             'proof_bytes': proof_bytes,
             'outs': outs,
-        };
+        }
 
-        const payload = serialize(requestData);
+        const payload = serialize(requestData)
 
         const { data } = await axios.post(`${this.url}/v0/wallet/activate-and-send-funds`, payload,
             this.headers({ 'Content-Type': 'application/json' })
-        );
+        )
 
         const response: CreateWalletResponse = {
             address: CSL.Address.from_bech32(data.address),
             transaction: data.transaction,
             transaction_fee: data.transaction_fee,
             transaction_id: data.transaction_id
-        };
+        }
 
-        return response;
+        return response
     }
 
     /**
@@ -149,21 +149,21 @@ export class Backend {
             'email': email,
             'outs': outs,
             'payment_key_hash': payment_key_hash,
-        };
+        }
 
-        const payload = serialize(requestData);
+        const payload = serialize(requestData)
 
         const { data } = await axios.post(`${this.url}/v0/wallet/send-funds`, payload,
             this.headers({ 'Content-Type': 'application/json' })
-        );
+        )
 
         const response: SendFundsResponse = {
             transaction: data.transaction,
             transaction_fee: data.transaction_fee,
             transaction_id: data.transaction_id
-        };
+        }
 
-        return response;
+        return response
     }
 
     /**
@@ -177,12 +177,12 @@ export class Backend {
         const { data } = await axios.post(`${this.url}/v0/tx/submit`, {
             email_recipients: email_recipients,
             transaction: transaction
-        }, this.headers());
+        }, this.headers())
 
         return {
             notifier_errors: data.notifier_errors,
             transaction_id: data.transaction_id
-        };
+        }
     }
 
     /**
@@ -198,12 +198,12 @@ export class Backend {
             unsigned_transaction: unsigned_transaction,
             vkey_witness: vkey_witness,
             email_recipients: email_recipients
-        }, this.headers());
+        }, this.headers())
 
         return {
             notifier_errors: data.notifier_errors,
             transaction_id: data.transaction_id
-        };
+        }
     }
 
     /**
@@ -213,13 +213,13 @@ export class Backend {
      * @returns {UTxO[]}
      */
     async addressUtxo(address: CSL.Address): Promise<UTxO[]> {
-        const { data } = await axios.post(`${this.url}/v0/address/utxos`, [address.to_bech32()], this.headers());
+        const { data } = await axios.post(`${this.url}/v0/address/utxos`, [address.to_bech32()], this.headers())
 
-        const result: UTxO[] = [];
+        const result: UTxO[] = []
 
         for (let i = 0; i < data.length; i++) {
-            const ref = data[i].ref;
-            const parts = ref.split("#");
+            const ref = data[i].ref
+            const parts = ref.split("#")
             const reference: Reference = {
                 transaction_id: parts[0],
                 output_index: Number(parts[1])
@@ -228,7 +228,7 @@ export class Backend {
             const values: { [key: string]: BigIntWrap } = {}
 
             for (const key in data[i].value) {
-                values[key] = new BigIntWrap(data[i].value[key]);
+                values[key] = new BigIntWrap(data[i].value[key])
             }
 
             const utxo: UTxO = {
@@ -236,9 +236,9 @@ export class Backend {
                 address: CSL.Address.from_bech32(data[i].address),
                 value: values
             }
-            result.push(utxo);
+            result.push(utxo)
         }
 
-        return result;
+        return result
     }
 }
