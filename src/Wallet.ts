@@ -1,6 +1,6 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, WalletInitialiser, AddressType, TransactionRequest, TransactionResult, ProofInput, SmartTxRecipient, Value } from './Types'
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, TransactionResult, ProofInput, SmartTxRecipient, Value } from './Types'
 import { Prover } from './Service/Prover'
 import { b64ToBn, harden, hexToBytes } from './Utils'
 import { Storage } from './Service/Storage'
@@ -24,9 +24,9 @@ export class Wallet extends EventTarget  {
     private prover: Prover
 
     /**
+     *  @param {GoogleApi} googleApi           - A GoogleApi object for interaction with Google OAuth
      *  @param {Prover} prover                 - A Prover object for interaction with the prover
      *  @param {Backend} backend               - A Backend object for interaction with the backend
-     *  @param {WalletInitialiser} initialiser - Data to initialise the wallet
      */
     constructor(googleApi: GoogleApi, backend: Backend, prover: Prover) {
         super()

@@ -37,18 +37,18 @@ export class GoogleApi {
         return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
     }
 
-    public async getJWTFromCode(code: string): Promise<string | undefined> {
+    public async getJWTFromCode(code: string): Promise<string | null> {
+        const tokenEndpoint = 'https://oauth2.googleapis.com/token'
+
+        const params = new URLSearchParams({
+            client_id: this.clientId,
+            client_secret: this.clientSecret,
+            code: code,
+            grant_type: 'authorization_code',
+            redirect_uri: this.redirectURL
+        })
+
         try {
-            const tokenEndpoint = 'https://oauth2.googleapis.com/token'
-
-            const params = new URLSearchParams({
-                client_id: this.clientId,
-                client_secret: this.clientSecret,
-                code: code,
-                grant_type: 'authorization_code',
-                redirect_uri: this.redirectURL
-            })
-
             const { data } = await axios.post<GoogleTokenResponse>(
                 tokenEndpoint,
                 params.toString(),
@@ -59,21 +59,26 @@ export class GoogleApi {
                 }
             )
 
-            return data.id_token
-        } catch (e) {
-            console.error('Token exchange failed', e)
-        }
+            return data.id_token || null
+        } catch (error) {
+            console.error('Error fetching JWT: ', error)
+            return null
+        }        
     }
 
     public async getMatchingKey(keyId: string): Promise<GoogleCertKey | null> {
-        const { data } = await axios.get<{ keys: GoogleCertKey[] }>('https://www.googleapis.com/oauth2/v3/certs')
-
-        for (const k of data.keys) {
-            if (k.kid === keyId) {
-                return k
+        try {
+            const { data } = await axios.get<{ keys: GoogleCertKey[] }>('https://www.googleapis.com/oauth2/v3/certs')
+    
+            for (const k of data.keys) {
+                if (k.kid === keyId) {
+                    return k
+                }
             }
+        } catch (error) {
+            console.error('Error fetching Google certs: ', error)
+            
         }
-
         return null
     }
 
