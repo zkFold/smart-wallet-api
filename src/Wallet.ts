@@ -68,66 +68,61 @@ export class Wallet extends EventTarget  {
     }
 
     public async oauthCallback(callbackData: string): Promise<void> {
-        try {
-            // Parse URL parameters to get authorization code
-            const params = new URLSearchParams(callbackData)
-            
-            const error = params.get('error')
-            if (error) {
-                throw new Error(`OAuth error: ${error}`)
-            }
-
-            const state = params.get('state')
-            const savedState = this.session.getState()
-            this.session.removeState()
-            if (state !== savedState) {
-                throw new Error('State mismatch. Possible CSRF attack')
-            }
-
-            const code = params.get('code')
-            if (!code) {
-                throw new Error('Missing authorization code')
-            }
-
-            // Get JWT token using authorization code (now async)
-            const jwt = await this.googleApi.getJWTFromCode(code)
-            if (!jwt) {
-                throw new Error('Failed to get JWT from authorization code')
-            }
-
-            this.userId = this.googleApi.getUserId(jwt)
-            const address = await this.addressForGmail(this.userId).then((x: any) => x.to_bech32())
-            
-            // Check if there is an existing wallet for the same Cardano address
-            const exitingWalletInit = this.storage.getWallet(address)
-            if (exitingWalletInit) {
-                // TODO: check if we have a UTxO with the token matching the existing wallet's tokenSKey
-
-                this.jwt = exitingWalletInit.jwt
-                this.tokenSKey = CSL.Bip32PrivateKey.from_hex(exitingWalletInit.tokenSKey as string)
-                this.activated = true
-            }
-            else {
-                this.jwt = jwt
-                const prvKey = CSL.Bip32PrivateKey
-                    .generate_ed25519_bip32()
-                    .derive(harden(1852)) // purpose
-                    .derive(harden(1815)) // coin type
-                    .derive(harden(0)) // account #0
-                    .derive(0)
-                    .derive(0)
-                this.tokenSKey = prvKey
-                this.activated = false
-                this.getProof()
-            }
-            this.userId = this.googleApi.getUserId(this.jwt)
-        } catch (error) {
-            console.error('OAuth callback failed:', error)
-            throw error
-        }
-
         // Redirect to root address
         window.history.replaceState({}, '', '/')
+
+        // Get saved state
+        const savedState = this.session.getState()
+        this.session.removeState()
+
+        // Parse URL parameters
+        const params = new URLSearchParams(callbackData)
+
+        // Validate state
+        const state = params.get('state')
+        if (state !== savedState) {
+            throw new Error('State mismatch. Possible CSRF attack')
+        }
+
+        // Get authorization code
+        const code = params.get('code')
+        if (!code) {
+            throw new Error('Missing authorization code')
+        }
+
+        // Get JWT token
+        const jwt = await this.googleApi.getJWTFromCode(code)
+        if (!jwt) {
+            throw new Error('Failed to get JWT from authorization code')
+        }
+
+        // Set user ID
+        this.userId = this.googleApi.getUserId(jwt)
+        // Get Cardano address
+        const address = await this.addressForGmail(this.userId).then((x: any) => x.to_bech32())
+        
+        // Check if there is an existing wallet for the same Cardano address
+        const exitingWalletInit = this.storage.getWallet(address)
+        if (exitingWalletInit) {
+            // TODO: check if we have a UTxO with the token matching the existing wallet's tokenSKey
+
+            this.jwt = exitingWalletInit.jwt
+            this.tokenSKey = CSL.Bip32PrivateKey.from_hex(exitingWalletInit.tokenSKey as string)
+            this.activated = true
+        }
+        else {
+            this.jwt = this.jwt
+            const prvKey = CSL.Bip32PrivateKey
+                .generate_ed25519_bip32()
+                .derive(harden(1852)) // purpose
+                .derive(harden(1815)) // coin type
+                .derive(harden(0)) // account #0
+                .derive(0)
+                .derive(0)
+            this.tokenSKey = prvKey
+            this.activated = false
+            this.getProof()
+        }
 
         // Dispatch wallet initialised event
         this.dispatchEvent(new Event('walletInitialized'))
@@ -139,22 +134,20 @@ export class Wallet extends EventTarget  {
         }
 
         const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex()
-        const parts = this.jwt.split(".")
-        const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'))
-
-        const keyId = JSON.parse(header).kid
+        const keyId = this.googleApi.getKeyId(this.jwt)
         const matchingKey = await this.googleApi.getMatchingKey(keyId)
         if (!matchingKey) {
             throw new Error(`Failed to find matching Google cert for key ${keyId}`)
         }
-        const signature = parts[2].replace(/-/g, '+').replace(/_/g, '/')
+        const signature = this.googleApi.getSignature(this.jwt)
         const empi: ProofInput = {
-            piPubE: b64ToBn(matchingKey.e.replace(/-/g, '+').replace(/_/g, '/')),
-            piPubN: b64ToBn(matchingKey.n.replace(/-/g, '+').replace(/_/g, '/')),
+            piPubE: b64ToBn(matchingKey.e),
+            piPubN: b64ToBn(matchingKey.n),
             piSignature: b64ToBn(signature),
             piTokenName: new BigIntWrap("0x" + pubkeyHex)
         }
 
+        this.jwt = this.googleApi.stripSignature(this.jwt)
         this.proof = await this.prover.prove(empi)
     }
 

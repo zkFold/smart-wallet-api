@@ -48,43 +48,51 @@ export class GoogleApi {
             redirect_uri: this.redirectURL
         })
 
-        try {
-            const { data } = await axios.post<GoogleTokenResponse>(
-                tokenEndpoint,
-                params.toString(),
-                {
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                }
-            )
+        const { data } = await axios.post<GoogleTokenResponse>(
+            tokenEndpoint,
+            params.toString(),
+            {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+            }
+        )
 
-            return data.id_token || null
-        } catch (error) {
-            console.error('Error fetching JWT: ', error)
-            return null
-        }        
+        return data.id_token || null
     }
 
     public async getMatchingKey(keyId: string): Promise<GoogleCertKey | null> {
-        try {
-            const { data } = await axios.get<{ keys: GoogleCertKey[] }>('https://www.googleapis.com/oauth2/v3/certs')
-    
-            for (const k of data.keys) {
-                if (k.kid === keyId) {
-                    return k
-                }
+        const { data } = await axios.get<{ keys: GoogleCertKey[] }>('https://www.googleapis.com/oauth2/v3/certs')
+
+        for (const k of data.keys) {
+            if (k.kid === keyId) {
+                k.e = k.e.replace(/-/g, '+').replace(/_/g, '/')
+                k.n = k.n.replace(/-/g, '+').replace(/_/g, '/')
+                return k
             }
-        } catch (error) {
-            console.error('Error fetching Google certs: ', error)
-            
         }
         return null
+    }
+
+    public getKeyId(jwt: string): string {
+        const parts = jwt.split(".")
+        const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'))
+        return JSON.parse(header).kid
     }
 
     public getUserId(jwt: string): string {
         const parts = jwt.split(".")
         const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
         return payload.email
+    }
+
+    public getSignature(jwt: string): string {
+        const parts = jwt.split(".")
+        return parts[2].replace(/-/g, '+').replace(/_/g, '/')
+    }
+
+    public stripSignature(jwt: string): string {
+        const parts = jwt.split(".")
+        return `${parts[0]}.${parts[1]}`
     }
 }
