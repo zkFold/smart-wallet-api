@@ -144,6 +144,9 @@ export class Wallet extends EventTarget  {
 
         const keyId = JSON.parse(header).kid
         const matchingKey = await this.googleApi.getMatchingKey(keyId)
+        if (!matchingKey) {
+            throw new Error(`Failed to find matching Google cert for key ${keyId}`)
+        }
         const signature = parts[2].replace(/-/g, '+').replace(/_/g, '/')
         const empi: ProofInput = {
             piPubE: b64ToBn(matchingKey.e.replace(/-/g, '+').replace(/_/g, '/')),
