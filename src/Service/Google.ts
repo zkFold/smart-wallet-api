@@ -60,7 +60,6 @@ export class GoogleApi {
             }
 
             const tokens = await response.json()
-            console.info('Tokens acquired.')
             return tokens.id_token
         } catch (e) {
             console.log(e)
