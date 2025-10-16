@@ -7,7 +7,7 @@ import * as CSL from '@emurgo/cardano-serialization-lib-browser';
  *  @property {string}      client_secret     - OAuth client secret
  */
 export interface ClientCredentials {
-    client_id: string,
+    client_id: string
     client_secret: string
 }
 
@@ -20,9 +20,9 @@ export interface ClientCredentials {
  *  @property {string}      transaction_id  - The ID of the wallet initialisation transaction
  */
 export interface CreateWalletResponse {
-    address: CSL.Address,
-    transaction: string,
-    transaction_fee: number,
+    address: CSL.Address
+    transaction: string
+    transaction_fee: number
     transaction_id: string
 }
 
@@ -34,8 +34,8 @@ export interface CreateWalletResponse {
  *  @property {string}      transaction_id  - The ID of the transaction
  */
 export interface SendFundsResponse {
-    transaction: string,
-    transaction_fee: number,
+    transaction: string
+    transaction_fee: number
     transaction_id: string
 }
 
@@ -46,7 +46,7 @@ export interface SendFundsResponse {
  * @property {Array}       notifier_errors        - Recipients who were not notified
  */
 export interface SubmitTxResult {
-    transaction_id: string,
+    transaction_id: string
     notifier_errors: FailedNotification[]
 }
 
@@ -57,6 +57,6 @@ export interface SubmitTxResult {
  * @property {string} error - The reason why notification failed
  */
 export interface FailedNotification {
-    email: string,
+    email: string
     error: string
 }
