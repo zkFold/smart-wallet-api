@@ -1,7 +1,7 @@
 import axios from 'axios';
 import forge from 'node-forge';
-import { ProofBytes, ProverPublicKey, ProofInput } from '../Types';
-import { serialize, parseProverKeys, parseProofStatus } from '../JSON';
+import { ProofBytes, ProverPublicKey, ProofInput, BigIntWrap } from '../Types';
+import { deserialize, serialize } from '../JSON';
 
 /**
  * A wrapper for interaction with the prover 
@@ -35,9 +35,8 @@ export class Prover {
      */
     public async serverKeys(): Promise<ProverPublicKey[]> {
         const { data } = await axios.get(`${this.url}/v0/keys`, this.headers())
-        return parseProverKeys(data)
+        return this.parseProverKeys(data)
     }
-
 
     /**
      * Submit a proof request to the Prover. It will return a Request ID which can be used to retrieve proof status
@@ -98,12 +97,12 @@ export class Prover {
      * @param {string} proofId request ID 
      * @returns {ProofBytes | string} ProofBytes if the proof has finished or 'Pending' otherwise
      */
-    public async proofStatus(proofId: string): Promise<ProofBytes | string> {
+    public async proofStatus(proofId: string): Promise<ProofBytes | null> {
         const { data } = await axios.post(`${this.url}/v0/proof-status`, proofId,
             // to prevent Axios from parsing the result and messing with numbers
             { ...this.headers({ "Content-Type": "application/json" }), ...{ responseType: 'text' } }
         )
-        return parseProofStatus(data)
+        return this.parseProofStatus(data)
     }
 
     /**
@@ -122,7 +121,7 @@ export class Prover {
 
                 console.log(`Status: ${response}`)
 
-                if (typeof response === 'object') {
+                if (typeof response === 'object' && response !== null) {
                     return response
                 }
 
@@ -134,6 +133,81 @@ export class Prover {
             }
         }
 
+    }
+
+    private parseProverKeys(json: any[]): ProverPublicKey[] {
+        const result = []
+        const arrayLength = json.length
+        for (let i = 0; i < arrayLength; i++) {
+            const safe = {
+                pkbId: json[i].id,
+                pkbPublic: {
+                    public_e: new BigIntWrap(json[i].public.public_e),
+                    public_n: new BigIntWrap(json[i].public.public_n),
+                    public_size: new BigIntWrap(json[i].public.public_size),
+                }
+            }
+            result.push(safe)
+        }
+        return result
+    }
+
+    private parseProofStatus(json: string): ProofBytes | null {
+        const unsafe = deserialize(json)
+        if (unsafe.tag == "Completed") {
+            return this.parseProofBytes(unsafe.contents.bytes)
+        }
+        return unsafe.tag
+    }
+
+    private parseProofBytes(json: string): ProofBytes | null {
+        console.log(json)
+        let unsafe
+        if (typeof json === 'string') {
+            unsafe = deserialize(json)
+        } else if (typeof json === "object") {
+            unsafe = json
+        } else {
+            return null
+        }
+
+        let l_xi = []
+
+        for (let i = 0; i < unsafe.l_xi.length; ++i) {
+            l_xi.push(new BigIntWrap(unsafe.l_xi[i]))
+        }
+
+        const wrapped = {
+            "a_xi_int": new BigIntWrap(unsafe.a_xi_int),
+            "b_xi_int": new BigIntWrap(unsafe.b_xi_int),
+            "c_xi_int": new BigIntWrap(unsafe.c_xi_int),
+            "cmA_bytes": unsafe.cmA_bytes,
+            "cmB_bytes": unsafe.cmB_bytes,
+            "cmC_bytes": unsafe.cmC_bytes,
+            "cmF_bytes": unsafe.cmF_bytes,
+            "cmH1_bytes": unsafe.cmH1_bytes,
+            "cmH2_bytes": unsafe.cmH2_bytes,
+            "cmQhigh_bytes": unsafe.cmQhigh_bytes,
+            "cmQlow_bytes": unsafe.cmQlow_bytes,
+            "cmQmid_bytes": unsafe.cmQmid_bytes,
+            "cmZ1_bytes": unsafe.cmZ1_bytes,
+            "cmZ2_bytes": unsafe.cmZ2_bytes,
+            "f_xi_int": new BigIntWrap(unsafe.f_xi_int),
+            "h1_xi'_int": new BigIntWrap(unsafe["h1_xi'_int"]),
+            "h2_xi_int": new BigIntWrap(unsafe.h2_xi_int),
+            "l1_xi": new BigIntWrap(unsafe.l1_xi),
+            "l_xi": l_xi,
+            "proof1_bytes": unsafe.proof1_bytes,
+            "proof2_bytes": unsafe.proof2_bytes,
+            "s1_xi_int": new BigIntWrap(unsafe.s1_xi_int),
+            "s2_xi_int": new BigIntWrap(unsafe.s2_xi_int),
+            "t_xi'_int": new BigIntWrap(unsafe["t_xi'_int"]),
+            "t_xi_int": new BigIntWrap(unsafe.t_xi_int),
+            "z1_xi'_int": new BigIntWrap(unsafe["z1_xi'_int"]),
+            "z2_xi'_int": new BigIntWrap(unsafe["z2_xi'_int"])
+        }
+
+        return wrapped
     }
 
 }
