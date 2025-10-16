@@ -50,7 +50,7 @@ export interface Output {
  * "4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189#1"
  */
 export interface Reference {
-    transaction_id: string,
+    transaction_id: string
     output_index: number
 }
 
@@ -76,9 +76,9 @@ export interface Reference {
  *  }
  */
 export interface UTxO {
-    ref: Reference,
-    address: CSL.Address,
+    ref: Reference
+    address: CSL.Address
     value: {
-        [key: string]: BigIntWrap;
+        [key: string]: BigIntWrap
     }
 }
