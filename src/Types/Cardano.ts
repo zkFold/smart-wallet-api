@@ -2,6 +2,15 @@ import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import { BigIntWrap } from './Common';
 
 /**
+ *  Value object representing assets (lovelace and tokens).
+ *  The keys are asset identifiers (policy_id + '.' + asset_name in hex) or 'lovelace' for ADA.
+ *  The values are BigIntWrap representing the quantity of each asset.
+ */
+export interface Value {
+    [key: string]: BigIntWrap
+}
+
+/**
  * Optional datum (inline or just hash) to be included.
  * 
  * @property {any} datum - Datum data
@@ -17,7 +26,7 @@ export interface TxDatum {
  *
  * @property {string} address 
  * @property {TxDatum} datum  - Optional datum (inline or just hash) to be included
- * @property {object} value 
+ * @property {Value} value 
  *
  * @example
  *
@@ -35,9 +44,7 @@ export interface TxDatum {
 export interface Output {
     address: string
     datum?: TxDatum
-    value: {
-        [key: string]: BigIntWrap
-    }
+    value: Value
 }
 
 /**
@@ -59,7 +66,7 @@ export interface Reference {
  *
  * @param {Reference}   ref          - Transaction output reference
  * @param {CLS.Address} address      - UTxO address
- * @param {object}      value        - UTxO assets
+ * @param {Value}       value        - UTxO assets
  *
  * @example
  *
@@ -78,7 +85,5 @@ export interface Reference {
 export interface UTxO {
     ref: Reference
     address: CSL.Address
-    value: {
-        [key: string]: BigIntWrap
-    }
+    value: Value
 }
