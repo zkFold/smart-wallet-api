@@ -1,7 +1,7 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import axios from 'axios';
 import { serialize } from '../JSON';
-import { BigIntWrap, ProofBytes, Output, Reference, UTxO, CreateWalletResponse, SendFundsResponse, SubmitTxResult, ClientCredentials } from '../Types'
+import { BigIntWrap, ProofBytes, Output, Reference, UTxO, CreateWalletResponse, SendFundsResponse, SubmitTxResult, ClientCredentials, Settings } from '../Types'
 
 /**
  * A wrapper for interaction with the backend.
@@ -39,15 +39,14 @@ export class Backend {
      * @async
      * @returns {Settings}
      */
-    async getSettings(): Promise<{ network: string, version: string }> {
+    async settings(): Promise<Settings> {
         const { data } = await axios.get(`${this.url}/v0/settings`, this.headers())
         return data
     }
 
     /**
-     * Get Google OAuth credentials 
+     * Get Google OAuth credentials
      * @async
-     * @param {string} clientName 
      * @returns {ClientCredentials}
      */
     async credentials(): Promise<ClientCredentials> {

@@ -1,6 +1,14 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 
 /**
+ * Smart Wallet Backend settings
+ */
+export interface Settings {
+    network: string
+    version: string
+}
+
+/**
  *  OAuth client credentials 
  *
  *  @property {string}      client_id         - OAuth client id

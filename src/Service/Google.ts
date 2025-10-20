@@ -1,3 +1,6 @@
+import axios from 'axios'
+import { GoogleTokenResponse, GoogleCertKey } from '../Types'
+
 export class GoogleApi {
     private clientId: string
     private clientSecret: string
@@ -31,54 +34,65 @@ export class GoogleApi {
             state: state
         })
 
-        const authorizationUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
-        return authorizationUrl
+        return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
     }
 
-    public async getJWTFromCode(code: string): Promise<string | undefined> {
-        try {
-            const tokenEndpoint = 'https://oauth2.googleapis.com/token'
+    public async getJWTFromCode(code: string): Promise<string | null> {
+        const tokenEndpoint = 'https://oauth2.googleapis.com/token'
 
-            const params = new URLSearchParams({
-                client_id: this.clientId,
-                client_secret: this.clientSecret,
-                code: code,
-                grant_type: 'authorization_code',
-                redirect_uri: this.redirectURL
-            })
+        const params = new URLSearchParams({
+            client_id: this.clientId,
+            client_secret: this.clientSecret,
+            code: code,
+            grant_type: 'authorization_code',
+            redirect_uri: this.redirectURL
+        })
 
-            const response = await fetch(tokenEndpoint, {
-                method: 'POST',
+        const { data } = await axios.post<GoogleTokenResponse>(
+            tokenEndpoint,
+            params.toString(),
+            {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: params.toString()
-            })
-
-            if (!response.ok) {
-                throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`)
             }
+        )
 
-            const tokens = await response.json()
-            return tokens.id_token
-        } catch (e) {
-            console.log(e)
-        }
+        return data.id_token || null
     }
 
-    public async getMatchingKey(keyId: string) {
-        const { keys } = await fetch('https://www.googleapis.com/oauth2/v3/certs').then((res) => res.json())
-        for (const k of keys) {
-            if (k.kid == keyId) {
+    public async getMatchingKey(keyId: string): Promise<GoogleCertKey | null> {
+        const { data } = await axios.get<{ keys: GoogleCertKey[] }>('https://www.googleapis.com/oauth2/v3/certs')
+
+        for (const k of data.keys) {
+            if (k.kid === keyId) {
+                k.e = k.e.replace(/-/g, '+').replace(/_/g, '/')
+                k.n = k.n.replace(/-/g, '+').replace(/_/g, '/')
                 return k
             }
         }
         return null
     }
 
+    public getKeyId(jwt: string): string {
+        const parts = jwt.split(".")
+        const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'))
+        return JSON.parse(header).kid
+    }
+
     public getUserId(jwt: string): string {
         const parts = jwt.split(".")
         const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
         return payload.email
+    }
+
+    public getSignature(jwt: string): string {
+        const parts = jwt.split(".")
+        return parts[2].replace(/-/g, '+').replace(/_/g, '/')
+    }
+
+    public stripSignature(jwt: string): string {
+        const parts = jwt.split(".")
+        return `${parts[0]}.${parts[1]}`
     }
 }

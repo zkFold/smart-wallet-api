@@ -1,5 +1,6 @@
 export * from './Types/Backend'
 export * from './Types/Cardano'
 export * from './Types/Common'
+export * from './Types/Google'
 export * from './Types/Prover'
 export * from './Types/Wallet'
