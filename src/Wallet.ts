@@ -24,11 +24,11 @@ export class Wallet extends EventTarget  {
     private prover: Prover
 
     /**
-     *  @param {GoogleApi} googleApi           - A GoogleApi object for interaction with Google OAuth
-     *  @param {Prover} prover                 - A Prover object for interaction with the prover
-     *  @param {Backend} backend               - A Backend object for interaction with the backend
+     *  @param {Backend} backend                 - A Backend object for interaction with the backend
+     *  @param {Prover} prover                   - A Prover object for interaction with the prover
+     *  @param {GoogleApi} googleApi             - A GoogleApi object for interaction with Google OAuth
      */
-    constructor(googleApi: GoogleApi, backend: Backend, prover: Prover) {
+    constructor(backend: Backend, prover: Prover, googleApi: GoogleApi) {
         super()
         this.storage = new Storage()
         this.session = new Session()
@@ -111,7 +111,7 @@ export class Wallet extends EventTarget  {
             this.activated = true
         }
         else {
-            this.jwt = this.jwt
+            this.jwt = jwt
             const prvKey = CSL.Bip32PrivateKey
                 .generate_ed25519_bip32()
                 .derive(harden(1852)) // purpose
