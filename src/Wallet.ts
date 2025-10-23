@@ -153,24 +153,6 @@ export class Wallet extends EventTarget  {
         this.dispatchEvent(new CustomEvent('proof_computed'))
     }
 
-    public async checkTransactionStatus(txId: string, recipient: string): Promise<any> {
-        try {
-            const address = CSL.Address.from_bech32(recipient)
-            const utxos = await this.backend.addressUtxo(address)
-
-            for (const utxo of utxos) {
-                if ((utxo as any).ref.transaction_id === txId) {
-                    return { outcome: "success", data: utxo }
-                }
-            }
-
-            return { outcome: "pending" }
-        } catch (error) {
-            console.error('Failed to check transaction status:', error)
-            return { outcome: "failure", reason: error }
-        }
-    }
-
     public getUserId(): string {
         if (!this.userId) {
             throw new Error('Wallet is not initialised')
@@ -324,15 +306,60 @@ export class Wallet extends EventTarget  {
             }
             this.dispatchEvent(new CustomEvent('transaction_pending', { detail: txId }))
 
-            // Emit proof computation complete event
+            // Save wallet state
             this.storage.saveWallet(await this.getAddress().then((x: any) => x.to_bech32()), {
                 jwt: this.jwt,
                 tokenSKey: this.tokenSKey.to_hex()
             })
+
+            // Set up confirmation tracking
+            let recipientAddress: string
+            if (request.recipientType === AddressType.Email) {
+                recipientAddress = await this.addressForGmail(request.recipient).then((x: any) => x.to_bech32())
+            } else {
+                recipientAddress = request.recipient
+            }
+            this.awaitTxConfirmed(txId, recipientAddress)
         } catch (error) {
             console.error('Transaction failed:', error)
             this.dispatchEvent(new CustomEvent('transaction_failed', { detail: error }))
             throw error
+        }
+    }
+
+    private async awaitTxConfirmed(txId: string, recipient: string): Promise<void> {
+        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+        while (true) {
+            const response = await this.checkTransactionStatus(txId, recipient)
+
+            if (response.outcome === "success") {
+                this.dispatchEvent(new CustomEvent('transaction_confirmed', { detail: response.data }))
+                return
+            } else if (response.outcome === "failure") {
+                this.dispatchEvent(new CustomEvent('transaction_failed', { detail: response.reason }))
+                return
+            }
+
+            await delay(30_000)
+        }
+    }
+
+    private async checkTransactionStatus(txId: string, recipient: string): Promise<any> {
+        try {
+            const address = CSL.Address.from_bech32(recipient)
+            const utxos = await this.backend.addressUtxo(address)
+
+            for (const utxo of utxos) {
+                if ((utxo as any).ref.transaction_id === txId) {
+                    return { outcome: "success", data: txId }
+                }
+            }
+
+            return { outcome: "pending" }
+        } catch (error) {
+            console.error('Failed to check transaction status:', error)
+            return { outcome: "failure", reason: error }
         }
     }
 

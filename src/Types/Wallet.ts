@@ -27,6 +27,7 @@ export type WalletEvent =
   | 'proof_computed'
   | 'transaction_initiated'
   | 'transaction_pending'
+  | 'transaction_confirmed'
   | 'transaction_failed'
   | 'logged_out'
 
@@ -43,6 +44,12 @@ export interface TransactionRequest {
     recipientType: AddressType
     asset: string
     amount: string
+}
+
+export interface TransactionResult {
+  txId: string
+  recipient: string
+  isProofComputing?: boolean
 }
 
 /**
