@@ -1,6 +1,6 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, TransactionResult, ProofInput, SmartTxRecipient, Value } from './Types'
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, Value } from './Types'
 import { Prover } from './Service/Prover'
 import { b64ToBn, harden, hexToBytes } from './Utils'
 import { Storage } from './Service/Storage'
@@ -64,7 +64,7 @@ export class Wallet extends EventTarget  {
         sessionStorage.clear()
 
         // Dispatch logout event
-        this.dispatchEvent(new Event('walletLoggedOut'))
+        this.dispatchEvent(new CustomEvent('logged_out'))
     }
 
     public async oauthCallback(callbackData: string): Promise<void> {
@@ -125,7 +125,7 @@ export class Wallet extends EventTarget  {
         }
 
         // Dispatch wallet initialised event
-        this.dispatchEvent(new Event('walletInitialized'))
+        this.dispatchEvent(new CustomEvent('initialized'))
     }
 
     private async getProof(): Promise<void> {
@@ -149,6 +149,8 @@ export class Wallet extends EventTarget  {
 
         this.jwt = this.googleApi.stripSignature(this.jwt)
         this.proof = await this.prover.prove(empi)
+
+        this.dispatchEvent(new CustomEvent('proof_computed'))
     }
 
     public async checkTransactionStatus(txId: string, recipient: string): Promise<any> {
@@ -282,6 +284,8 @@ export class Wallet extends EventTarget  {
     }
 
     public async sendTransaction(request: TransactionRequest): Promise<void> {
+        this.dispatchEvent(new CustomEvent('transaction_initiated', { detail: this.proof !== null }))
+
         try {
             if (!this.jwt || !this.tokenSKey || !this.userId) {
                 throw new Error('There is no active wallet when sending transaction')
@@ -305,23 +309,7 @@ export class Wallet extends EventTarget  {
                 default:
                     throw new Error(`Unsupported recipient type: ${request.recipientType}`)
             }
-
-            // Get recipient address for tracking
-            let recipientAddress: string
-            if (request.recipientType === AddressType.Email) {
-                recipientAddress = await this.addressForGmail(request.recipient).then((x: any) => x.to_bech32())
-            } else {
-                recipientAddress = request.recipient
-            }
-
-            // Navigate to success view immediately with proof computing state
-            const initialResult: TransactionResult = {
-                txId: 'Computing...', // Temporary value while computing
-                recipient: recipientAddress,
-                isProofComputing: true
-            }
-            this.dispatchEvent(new CustomEvent('transactionComplete', { detail: initialResult }))
-
+            
             // Send transaction (this includes the proof computation)
             const txResponse = await this.sendTo(recipient)
             const txId = txResponse.transaction_id;
@@ -334,22 +322,16 @@ export class Wallet extends EventTarget  {
                     console.error(`Failed to notify recipient ${failedNotification.email}: ${failedNotification.error}`);
                 }
             }
+            this.dispatchEvent(new CustomEvent('transaction_pending', { detail: txId }))
 
             // Emit proof computation complete event
-            const finalResult: TransactionResult = {
-                txId,
-                recipient: recipientAddress,
-                isProofComputing: false
-            }
             this.storage.saveWallet(await this.getAddress().then((x: any) => x.to_bech32()), {
                 jwt: this.jwt,
                 tokenSKey: this.tokenSKey.to_hex()
             })
-            this.dispatchEvent(new CustomEvent('proofComputationComplete', { detail: finalResult }))
-
         } catch (error) {
             console.error('Transaction failed:', error)
-            this.dispatchEvent(new CustomEvent('transactionFailed', { detail: error }))
+            this.dispatchEvent(new CustomEvent('transaction_failed', { detail: error }))
             throw error
         }
     }
