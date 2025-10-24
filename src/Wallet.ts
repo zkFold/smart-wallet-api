@@ -406,7 +406,7 @@ export class Wallet extends EventTarget  {
         transaction.sign_and_add_vkey_signature(this.tokenSKey.to_raw_key())
         const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('')
 
-        const submitTxResult = await this.backend.submitTx(signedTxHex, emailRecipients)
+        const submitTxResult = await this.backend.submitTx(signedTxHex, emailRecipients, this.userId)
         this.activated = true
 
         return submitTxResult
