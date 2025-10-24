@@ -46,12 +46,6 @@ export interface TransactionRequest {
     amount: string
 }
 
-export interface TransactionResult {
-  txId: string
-  recipient: string
-  isProofComputing?: boolean
-}
-
 /**
  * Describes the recipient of ADA
  * @property {AddressType} recipientType  - Type of wallet the recipient holds

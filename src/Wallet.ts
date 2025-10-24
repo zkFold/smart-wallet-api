@@ -304,7 +304,7 @@ export class Wallet extends EventTarget  {
                     console.error(`Failed to notify recipient ${failedNotification.email}: ${failedNotification.error}`);
                 }
             }
-            this.dispatchEvent(new CustomEvent('transaction_pending', { detail: txId }))
+            this.dispatchEvent(new CustomEvent('transaction_pending', { detail: request }))
 
             // Save wallet state
             this.storage.saveWallet(await this.getAddress().then((x: any) => x.to_bech32()), {
