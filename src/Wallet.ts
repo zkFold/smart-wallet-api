@@ -53,6 +53,10 @@ export class Wallet extends EventTarget  {
         return this.jwt !== undefined && this.tokenSKey !== undefined && this.userId !== undefined
     }
 
+    public hasProof(): boolean {
+        return this.proof !== null
+    }
+
     public logout(): void {
         this.jwt = undefined
         this.tokenSKey = undefined
@@ -266,7 +270,7 @@ export class Wallet extends EventTarget  {
     }
 
     public async sendTransaction(request: TransactionRequest): Promise<void> {
-        this.dispatchEvent(new CustomEvent('transaction_initiated', { detail: this.proof !== null }))
+        this.dispatchEvent(new CustomEvent('transaction_initiated', { detail: this.hasProof() }))
 
         try {
             if (!this.jwt || !this.tokenSKey || !this.userId) {
@@ -404,7 +408,7 @@ export class Wallet extends EventTarget  {
             const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'))
             const payload = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
             const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-            while (!this.proof) {
+            while (!this.hasProof()) {
                 await delay(5_000)
             }
             const resp = await this.backend.activateAndSendFunds(header + '.' + payload, pubkeyHex, this.proof as ProofBytes, outs)
