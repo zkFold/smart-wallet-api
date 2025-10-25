@@ -14,7 +14,7 @@ export class Wallet extends EventTarget  {
     private jwt?: string
     private tokenSKey?: CSL.Bip32PrivateKey
     private userId?: string
-    private activated: Boolean = false
+    private activated: boolean = false
     private proof: ProofBytes | null = null
 
     private storage: Storage
@@ -54,7 +54,7 @@ export class Wallet extends EventTarget  {
     }
 
     public hasProof(): boolean {
-        return this.proof !== null
+        return this.activated || this.proof !== null
     }
 
     public logout(): void {
