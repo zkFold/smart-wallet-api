@@ -1,6 +1,6 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, TransactionResult, ProofInput, SmartTxRecipient, Value } from './Types'
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, Value } from './Types'
 import { Prover } from './Service/Prover'
 import { b64ToBn, harden, hexToBytes } from './Utils'
 import { Storage } from './Service/Storage'
@@ -14,7 +14,7 @@ export class Wallet extends EventTarget  {
     private jwt?: string
     private tokenSKey?: CSL.Bip32PrivateKey
     private userId?: string
-    private activated: Boolean = false
+    private activated: boolean = false
     private proof: ProofBytes | null = null
 
     private storage: Storage
@@ -53,6 +53,10 @@ export class Wallet extends EventTarget  {
         return this.jwt !== undefined && this.tokenSKey !== undefined && this.userId !== undefined
     }
 
+    public hasProof(): boolean {
+        return this.activated || this.proof !== null
+    }
+
     public logout(): void {
         this.jwt = undefined
         this.tokenSKey = undefined
@@ -64,7 +68,7 @@ export class Wallet extends EventTarget  {
         sessionStorage.clear()
 
         // Dispatch logout event
-        this.dispatchEvent(new Event('walletLoggedOut'))
+        this.dispatchEvent(new CustomEvent('logged_out'))
     }
 
     public async oauthCallback(callbackData: string): Promise<void> {
@@ -125,7 +129,7 @@ export class Wallet extends EventTarget  {
         }
 
         // Dispatch wallet initialised event
-        this.dispatchEvent(new Event('walletInitialized'))
+        this.dispatchEvent(new CustomEvent('initialized'))
     }
 
     private async getProof(): Promise<void> {
@@ -149,24 +153,8 @@ export class Wallet extends EventTarget  {
 
         this.jwt = this.googleApi.stripSignature(this.jwt)
         this.proof = await this.prover.prove(empi)
-    }
 
-    public async checkTransactionStatus(txId: string, recipient: string): Promise<any> {
-        try {
-            const address = CSL.Address.from_bech32(recipient)
-            const utxos = await this.backend.addressUtxo(address)
-
-            for (const utxo of utxos) {
-                if ((utxo as any).ref.transaction_id === txId) {
-                    return { outcome: "success", data: utxo }
-                }
-            }
-
-            return { outcome: "pending" }
-        } catch (error) {
-            console.error('Failed to check transaction status:', error)
-            return { outcome: "failure", reason: error }
-        }
+        this.dispatchEvent(new CustomEvent('proof_computed'))
     }
 
     public getUserId(): string {
@@ -282,6 +270,8 @@ export class Wallet extends EventTarget  {
     }
 
     public async sendTransaction(request: TransactionRequest): Promise<void> {
+        this.dispatchEvent(new CustomEvent('transaction_initiated', { detail: this.hasProof() }))
+
         try {
             if (!this.jwt || !this.tokenSKey || !this.userId) {
                 throw new Error('There is no active wallet when sending transaction')
@@ -305,23 +295,7 @@ export class Wallet extends EventTarget  {
                 default:
                     throw new Error(`Unsupported recipient type: ${request.recipientType}`)
             }
-
-            // Get recipient address for tracking
-            let recipientAddress: string
-            if (request.recipientType === AddressType.Email) {
-                recipientAddress = await this.addressForGmail(request.recipient).then((x: any) => x.to_bech32())
-            } else {
-                recipientAddress = request.recipient
-            }
-
-            // Navigate to success view immediately with proof computing state
-            const initialResult: TransactionResult = {
-                txId: 'Computing...', // Temporary value while computing
-                recipient: recipientAddress,
-                isProofComputing: true
-            }
-            this.dispatchEvent(new CustomEvent('transactionComplete', { detail: initialResult }))
-
+            
             // Send transaction (this includes the proof computation)
             const txResponse = await this.sendTo(recipient)
             const txId = txResponse.transaction_id;
@@ -334,23 +308,62 @@ export class Wallet extends EventTarget  {
                     console.error(`Failed to notify recipient ${failedNotification.email}: ${failedNotification.error}`);
                 }
             }
+            this.dispatchEvent(new CustomEvent('transaction_pending', { detail: request }))
 
-            // Emit proof computation complete event
-            const finalResult: TransactionResult = {
-                txId,
-                recipient: recipientAddress,
-                isProofComputing: false
-            }
+            // Save wallet state
             this.storage.saveWallet(await this.getAddress().then((x: any) => x.to_bech32()), {
                 jwt: this.jwt,
                 tokenSKey: this.tokenSKey.to_hex()
             })
-            this.dispatchEvent(new CustomEvent('proofComputationComplete', { detail: finalResult }))
 
+            // Set up confirmation tracking
+            let recipientAddress: string
+            if (request.recipientType === AddressType.Email) {
+                recipientAddress = await this.addressForGmail(request.recipient).then((x: any) => x.to_bech32())
+            } else {
+                recipientAddress = request.recipient
+            }
+            this.awaitTxConfirmed(txId, recipientAddress)
         } catch (error) {
             console.error('Transaction failed:', error)
-            this.dispatchEvent(new CustomEvent('transactionFailed', { detail: error }))
+            this.dispatchEvent(new CustomEvent('transaction_failed', { detail: error }))
             throw error
+        }
+    }
+
+    private async awaitTxConfirmed(txId: string, recipient: string): Promise<void> {
+        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+        while (true) {
+            const response = await this.checkTransactionStatus(txId, recipient)
+
+            if (response.outcome === "success") {
+                this.dispatchEvent(new CustomEvent('transaction_confirmed', { detail: response.data }))
+                return
+            } else if (response.outcome === "failure") {
+                this.dispatchEvent(new CustomEvent('transaction_failed', { detail: response.reason }))
+                return
+            }
+
+            await delay(30_000)
+        }
+    }
+
+    private async checkTransactionStatus(txId: string, recipient: string): Promise<any> {
+        try {
+            const address = CSL.Address.from_bech32(recipient)
+            const utxos = await this.backend.addressUtxo(address)
+
+            for (const utxo of utxos) {
+                if ((utxo as any).ref.transaction_id === txId) {
+                    return { outcome: "success", data: txId }
+                }
+            }
+
+            return { outcome: "pending" }
+        } catch (error) {
+            console.error('Failed to check transaction status:', error)
+            return { outcome: "failure", reason: error }
         }
     }
 
@@ -395,7 +408,7 @@ export class Wallet extends EventTarget  {
             const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'))
             const payload = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
             const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-            while (!this.proof) {
+            while (!this.hasProof()) {
                 await delay(5_000)
             }
             const resp = await this.backend.activateAndSendFunds(header + '.' + payload, pubkeyHex, this.proof as ProofBytes, outs)

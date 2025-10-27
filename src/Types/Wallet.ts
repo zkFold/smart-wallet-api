@@ -23,11 +23,13 @@ export interface WalletInitialiser {
  *  'walletLoggedOut' - emitted when the wallet is logged out
  */
 export type WalletEvent =
-    'walletInitialized'
-  | 'proofComputationComplete'
-  | 'transactionComplete'
-  | 'transactionFailed'
-  | 'walletLoggedOut'
+    'initialized'
+  | 'proof_computed'
+  | 'transaction_initiated'
+  | 'transaction_pending'
+  | 'transaction_confirmed'
+  | 'transaction_failed'
+  | 'logged_out'
 
 /**
  * The recipient address types we support.
@@ -42,12 +44,6 @@ export interface TransactionRequest {
     recipientType: AddressType
     asset: string
     amount: string
-}
-
-export interface TransactionResult {
-  txId: string
-  recipient: string
-  isProofComputing?: boolean
 }
 
 /**
