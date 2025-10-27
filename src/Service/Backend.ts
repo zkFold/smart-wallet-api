@@ -172,9 +172,10 @@ export class Backend {
      * @param {string[]} email_recipients
      * @returns {SubmitTxResult} - Transaction ID and email delivery errors, if any
      */
-    async submitTx(transaction: string, email_recipients: string[] = []): Promise<SubmitTxResult> {
+    async submitTx(transaction: string, email_recipients: string[] = [], sender?: string): Promise<SubmitTxResult> {
         const { data } = await axios.post(`${this.url}/v0/tx/submit`, {
             email_recipients: email_recipients,
+            sender: sender,
             transaction: transaction
         }, this.headers())
 
@@ -192,11 +193,12 @@ export class Backend {
      * @param {string[]} email_recipients
      * @returns {SubmitTxResult} - Transaction ID and email delivery errors, if any
      */
-    async addVkeyAndSubmitTx(unsigned_transaction: string, vkey_witness: string, email_recipients: string[] = []): Promise<SubmitTxResult> {
+    async addVkeyAndSubmitTx(unsigned_transaction: string, vkey_witness: string, email_recipients: string[] = [], sender?: string): Promise<SubmitTxResult> {
         const { data } = await axios.post(`${this.url}/v0/tx/add-vkey-and-submit`, {
             unsigned_transaction: unsigned_transaction,
             vkey_witness: vkey_witness,
-            email_recipients: email_recipients
+            email_recipients: email_recipients,
+            sender: sender
         }, this.headers())
 
         return {
