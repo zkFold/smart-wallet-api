@@ -124,12 +124,11 @@ export class Prover {
                 if (typeof response === 'object' && response !== null) {
                     return response
                 }
-
-                await delay(30_000)
-
             } catch (error) {
                 console.error('Error checking status:', error)
             }
+
+            await delay(30_000)
         }
 
     }
