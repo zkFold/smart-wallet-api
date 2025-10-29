@@ -82,10 +82,11 @@ export interface FailedNotification {
 export interface PrettyToken {
     asset: string
     amount: number
-    ticker: string 
+    ticker?: string 
+    description: string
     token_name: string 
-    decimal_adjustment: number
-    logo: string
+    decimal_adjustment?: number
+    logo?: string
 }
 
 /**
