@@ -1,7 +1,7 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import axios from 'axios';
 import { serialize } from '../JSON';
-import { BigIntWrap, ProofBytes, Output, Reference, UTxO, CreateWalletResponse, SendFundsResponse, SubmitTxResult, ClientCredentials, Settings } from '../Types'
+import { BigIntWrap, ProofBytes, Output, Reference, UTxO, CreateWalletResponse, SendFundsResponse, SubmitTxResult, ClientCredentials, Settings, BalanceResponse } from '../Types'
 
 /**
  * A wrapper for interaction with the backend.
@@ -241,5 +241,16 @@ export class Backend {
         }
 
         return result
+    }
+
+    /**
+     * Get assets held by an address and their approximate value in USD
+     * @async
+     * @param {CSL.Address} address
+     * @returns {BalanceResponse}
+     */
+    async balance(address: CSL.Address): Promise<BalanceResponse> {
+        const { data } = await axios.post(`${this.url}/v0/address/balance`, address.to_bech32(), this.headers({ 'Content-Type': 'application/json' }))
+        return data
     }
 }

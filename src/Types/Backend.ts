@@ -68,3 +68,36 @@ export interface FailedNotification {
     email: string
     error: string
 }
+
+
+/**
+ * Details of a token from Cardano Token Registry 
+ * 
+ * @property {string} asset - The asset name <minting_policy_id>.<asset_name> 
+ * @property {string} ticker - The ticker of a token (e.g. SNEK) 
+ * @property {string} token_name - The token name (e.g. Snek)
+ * @property {number} decimal_adjustment - The numeric value that specifies the number of decimal places that the token can have
+ * @property {string} logo - The token logo as a base64 string 
+ */
+export interface PrettyToken {
+    asset: string
+    amount: number
+    ticker?: string 
+    description: string
+    token_name: string 
+    decimal_adjustment?: number
+    logo?: string
+}
+
+/**
+ * Balance of a wallet 
+ * 
+ * @property {number} lovelace - The number of lovelace held 
+ * @property {Array}  tokens - The array of tokens held
+ * @property {number} usd - the approximate value of the assets in USD
+ */
+export interface BalanceResponse {
+    lovelace: number 
+    tokens: PrettyToken[]
+    usd: number
+}

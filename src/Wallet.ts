@@ -1,6 +1,6 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, Value } from './Types'
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, Value, BalanceResponse } from './Types'
 import { Prover } from './Service/Prover'
 import { b64ToBn, harden, hexToBytes } from './Utils'
 import { Storage } from './Service/Storage'
@@ -187,18 +187,19 @@ export class Wallet extends EventTarget  {
      * @async
      * Get wallet's balance as an object with asset names as property names and amounts as their values.
      */
-    public async getBalance(): Promise<Value> {
-        const utxos = await this.getUtxos()
-        const value: Value = {}
-        for (let i = 0; i < utxos.length; i++) {
-            for (const key in utxos[i].value) {
-                if (!(key in value)) {
-                    value[key] = new BigIntWrap(0)
-                }
-                value[key].increase(utxos[i].value[key])
-            }
-        }
-        return value
+    public async getBalance(): Promise<BalanceResponse> {
+        const address = await this.getAddress()
+        const balance = await this.backend.balance(address)
+        return balance
+    }
+
+    /**
+     * @async
+     * Get the approximate USD value of all wallet's assets 
+     */
+    public async getUSDValue(): Promise<number> {
+        const balance = await this.getBalance()
+        return balance.usd
     }
 
     /**
