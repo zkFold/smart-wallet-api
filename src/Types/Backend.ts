@@ -101,3 +101,20 @@ export interface BalanceResponse {
     tokens: PrettyToken[]
     usd: number
 }
+
+/**
+ * Transaction from transaction history 
+ * 
+ * @property {string} transaction_id - Transaction id 
+ * @property {{ [asset: string]: number }}  value_diff - Dictionary with sent (negative value) and received (positive value) assets 
+ * @property {string} timestamp - Transaction date 
+ * @property {CSL.Address[]} from_addrs - Addresses in the transaction inputs 
+ * @property {CSL.Address[]} to_addrs - Addresses in the transaction outputs 
+ */
+export interface Transaction {
+    transaction_id: string
+    value_diff: { [asset: string]: number }
+    timestamp: string
+    from_addrs: CSL.Address[]
+    to_addrs: CSL.Address[]
+}

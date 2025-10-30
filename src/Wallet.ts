@@ -1,6 +1,6 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, Value, BalanceResponse } from './Types'
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, BalanceResponse, Transaction } from './Types'
 import { Prover } from './Service/Prover'
 import { b64ToBn, harden, hexToBytes } from './Utils'
 import { Storage } from './Service/Storage'
@@ -200,6 +200,17 @@ export class Wallet extends EventTarget  {
     public async getUSDValue(): Promise<number> {
         const balance = await this.getBalance()
         return balance.usd
+    }
+
+    /**
+     * @async
+     * Get wallet's transaction history 
+     */
+    public async getTxHistory(): Promise<Transaction[]> {
+        if (!this.userId) {
+            throw new Error('Wallet is not initialised')
+        }
+        return await this.backend.txHistory(this.userId) 
     }
 
     /**

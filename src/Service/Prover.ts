@@ -169,7 +169,7 @@ export class Prover {
             return null
         }
 
-        let l_xi = []
+        const l_xi = []
 
         for (let i = 0; i < unsafe.l_xi.length; ++i) {
             l_xi.push(new BigIntWrap(unsafe.l_xi[i]))
