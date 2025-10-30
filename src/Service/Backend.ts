@@ -1,7 +1,7 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import axios from 'axios';
 import { serialize } from '../JSON';
-import { BigIntWrap, ProofBytes, Output, Reference, UTxO, CreateWalletResponse, SendFundsResponse, SubmitTxResult, ClientCredentials, Settings, BalanceResponse } from '../Types'
+import { BigIntWrap, ProofBytes, Output, Reference, UTxO, CreateWalletResponse, SendFundsResponse, SubmitTxResult, ClientCredentials, Settings, BalanceResponse, Transaction } from '../Types'
 
 /**
  * A wrapper for interaction with the backend.
@@ -253,4 +253,25 @@ export class Backend {
         const { data } = await axios.post(`${this.url}/v0/address/balance`, address.to_bech32(), this.headers({ 'Content-Type': 'application/json' }))
         return data
     }
+
+    /**
+     * Get transaction history of a email address 
+     * @async
+     * @param {string} address
+     * @returns {Transaction[]}
+     */
+    async txHistory(email: string): Promise<Transaction[]> {
+        const { data } = await axios.post(`${this.url}/v0/wallet/txs`, { 'email': email }, this.headers())
+
+        console.log(data)
+        
+        // TODO: fetch token tickers from Cardano Token Registry if it isn't done on the back end
+        // 
+        return data.map((tx: any) => {
+            tx.from_addrs = tx.from_addrs.map((addr: string) => CSL.Address.from_bech32(addr))
+            tx.to_addrs = tx.to_addrs.map((addr: string) => CSL.Address.from_bech32(addr))
+            return tx
+        })
+    }
+
 }
