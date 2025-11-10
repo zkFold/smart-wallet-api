@@ -336,9 +336,9 @@ export class Wallet extends EventTarget  {
                 recipientAddress = request.recipient
             }
             this.awaitTxConfirmed(txId, recipientAddress)
-        } catch (error) {
+        } catch (error: any) {
             console.error('Transaction failed:', error)
-            this.dispatchEvent(new CustomEvent('transaction_failed', { detail: error }))
+            this.dispatchEvent(new CustomEvent('transaction_failed', { detail: error.message }))
             throw error
         }
     }
@@ -393,6 +393,18 @@ export class Wallet extends EventTarget  {
         console.log(rec.recipientType)
         console.log(rec.address)
         console.log(rec.assets)
+
+        // Check that the wallet has enough ada
+        let requiredAda: number
+        if (this.activated) {
+            requiredAda = (rec.assets['lovelace'].toNumber()) / 1_000_000 + 2
+        } else {
+            requiredAda = (rec.assets['lovelace'].toNumber()) / 1_000_000 + 8
+        }
+        const balance = await this.getBalance()
+        if (balance.lovelace / 1_000_000 < requiredAda) {
+            throw new Error('Insufficient ADA to perform this transaction. You need at least ' + requiredAda + ' ADA.')
+        }
 
         let recipientAddress
 
