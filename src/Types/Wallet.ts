@@ -57,3 +57,18 @@ export interface SmartTxRecipient {
     address: string
     assets: Value
 }
+
+/**
+ * Describes a cn=onstructed transaction from the smart wallet with the information about fees
+ * @property {string} txHex                     - Unsigned CBOR of a transaction 
+ * @property {[feeType: string]: number} txFees - Dictionary with all the transaction fees. 
+ *      Always contains 'network' corresponding to the regular Cardano network fees. 
+ *      May contain 'activation' corresponding to zkFold activation fees. 
+ *      May contain 'deposit' corresponding to the deposit of a stake key registration
+ * @property {string[]}                         - Email addresses of tx recipients
+ */
+export interface TransactionInfo {
+    txHex: string
+    txFees: { [feeType: string]: number; }
+    txRecipients: string[]
+}

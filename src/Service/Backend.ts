@@ -274,4 +274,14 @@ export class Backend {
         })
     }
 
+    /**
+     * Get the wallet activation fee, excluding network fee and deposit 
+     * @async
+     * @returns {number}
+     */
+    public async activationFee(): Promise<number> {
+        const { data } = await axios.get(`${this.url}/v0/wallet/activation-fee`, this.headers())
+        return data
+    }
+
 }

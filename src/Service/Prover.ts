@@ -97,7 +97,7 @@ export class Prover {
      * @param {string} proofId request ID 
      * @returns {ProofBytes | string} ProofBytes if the proof has finished or 'Pending' otherwise
      */
-    public async proofStatus(proofId: string): Promise<ProofBytes | null> {
+    public async proofStatus(proofId: string): Promise<ProofBytes | string | null> {
         const { data } = await axios.post(`${this.url}/v0/proof-status`, proofId,
             // to prevent Axios from parsing the result and messing with numbers
             { ...this.headers({ "Content-Type": "application/json" }), ...{ responseType: 'text' } }
@@ -150,7 +150,7 @@ export class Prover {
         return result
     }
 
-    private parseProofStatus(json: string): ProofBytes | null {
+    private parseProofStatus(json: string): ProofBytes | string | null {
         const unsafe = deserialize(json)
         if (unsafe.tag == "Completed") {
             return this.parseProofBytes(unsafe.contents.bytes)

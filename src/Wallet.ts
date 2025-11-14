@@ -1,6 +1,6 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, BalanceResponse, Transaction } from './Types'
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, BalanceResponse, Transaction, TransactionInfo } from './Types'
 import { Prover } from './Service/Prover'
 import { b64ToBn, harden, hexToBytes } from './Utils'
 import { Storage } from './Service/Storage'
@@ -281,13 +281,36 @@ export class Wallet extends EventTarget  {
         return await this.getAddress()
     }
 
+
+    /**
+     * Create Smart Transaction Recipient from a Transaction Request 
+     */
+    public recipientFromRequest(request: TransactionRequest): SmartTxRecipient {
+        // Create asset dictionary
+        const assetDict: { [key: string]: BigIntWrap } = {}
+        assetDict[request.asset] = new BigIntWrap(request.amount)
+
+        let recipient: SmartTxRecipient
+        switch (request.recipientType) {
+            case AddressType.Bech32:
+                recipient = { recipientType: AddressType.Bech32, address: request.recipient, assets: assetDict }
+                break
+            case AddressType.Email:
+                recipient = { recipientType: AddressType.Email, address: request.recipient, assets: assetDict }
+                break
+            default:
+                throw new Error(`Unsupported recipient type: ${request.recipientType}`)
+        }
+        return recipient
+    }
+
     /**
      * @async
-     * Send a transaction from this wallet.
+     * Construct a transaction from this wallet and obtain all incurred fees.
      *
      * @param {TransactionRequest} request - Transaction request object
      */
-    public async sendTransaction(request: TransactionRequest): Promise<void> {
+    public async prepareTransaction(request: TransactionRequest): Promise<TransactionInfo> {
         this.dispatchEvent(new CustomEvent('transaction_initiated', { detail: this.hasProof() }))
 
         try {
@@ -297,25 +320,32 @@ export class Wallet extends EventTarget  {
 
             console.log(`Sending ${request.amount} ${request.asset} to ${request.recipient} using ${request.recipientType}`)
 
-            // Create asset dictionary
-            const assetDict: { [key: string]: BigIntWrap } = {}
-            assetDict[request.asset] = new BigIntWrap(request.amount)
-
             // Create recipient
-            let recipient: SmartTxRecipient
-            switch (request.recipientType) {
-                case AddressType.Bech32:
-                    recipient = { recipientType: AddressType.Bech32, address: request.recipient, assets: assetDict }
-                    break
-                case AddressType.Email:
-                    recipient = { recipientType: AddressType.Email, address: request.recipient, assets: assetDict }
-                    break
-                default:
-                    throw new Error(`Unsupported recipient type: ${request.recipientType}`)
-            }
+            const recipient = this.recipientFromRequest(request)
             
-            // Send transaction (this includes the proof computation)
-            const txResponse = await this.sendTo(recipient)
+            // construct transaction (this includes the proof computation)
+            const txInfo = await this.constructTransaction(recipient)
+            return txInfo
+        } catch (error: any) {
+            console.error('Transaction failed:', error)
+            this.dispatchEvent(new CustomEvent('transaction_failed', { detail: error.message }))
+            throw error
+        }
+    }
+
+    /**
+     * @async
+     * Sign and submit a constructed transaction 
+     *
+     * @param {TransactionRequest} request - Transaction request object
+     * @param {TransactionInfo} txInfo     - Transaction with metadata
+     */
+    public async submitTransaction(request: TransactionRequest, txInfo: TransactionInfo): Promise<void> {
+        try {
+            if (!this.jwt || !this.tokenSKey || !this.userId) {
+                throw new Error('There is no active wallet when sending transaction')
+            }
+            const txResponse = await this.signAndSubmit(txInfo)
             const txId = txResponse.transaction_id;
             const failedEmails = txResponse.notifier_errors;
             console.log(`Transaction ID: ${txId}`)
@@ -385,7 +415,7 @@ export class Wallet extends EventTarget  {
         }
     }
 
-    private async sendTo(rec: SmartTxRecipient): Promise<SubmitTxResult> {
+    private async constructTransaction(rec: SmartTxRecipient): Promise<TransactionInfo> {
         if (!this.userId || !this.tokenSKey || !this.jwt) {
             throw new Error('Wallet is not initialised')
         }
@@ -421,11 +451,13 @@ export class Wallet extends EventTarget  {
         }
 
         let txHex
+        const fees: { [feeType: string]: number } = {}
         const outs: Output[] = [{ address: recipientAddress.to_bech32(), value: rec.assets }]
 
         if (this.activated) {
             const resp = await this.backend.sendFunds(this.userId, outs, this.tokenSKey.to_public().to_raw_key().hash().to_hex())
             txHex = resp.transaction
+            fees['network'] = resp.transaction_fee
         } else {
             const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex()
             const parts = this.jwt.split(".")
@@ -437,13 +469,30 @@ export class Wallet extends EventTarget  {
             }
             const resp = await this.backend.activateAndSendFunds(header + '.' + payload, pubkeyHex, this.proof as ProofBytes, outs)
             txHex = resp.transaction
-
+            fees['network'] = resp.transaction_fee
+            fees['deposit'] = 2000000
+            const activationFee = await this.backend.activationFee()
+            fees['activation'] = activationFee
         }
-        const transaction = CSL.FixedTransaction.from_bytes(hexToBytes(txHex))
+
+        const txInfo: TransactionInfo = {
+            txHex: txHex,
+            txFees: fees,
+            txRecipients: emailRecipients, 
+        }
+
+        return txInfo
+    }
+
+    private async signAndSubmit(txInfo: TransactionInfo): Promise<SubmitTxResult> {
+        if (!this.userId || !this.tokenSKey || !this.jwt) {
+            throw new Error('Wallet is not initialised')
+        }
+        const transaction = CSL.FixedTransaction.from_bytes(hexToBytes(txInfo.txHex))
         transaction.sign_and_add_vkey_signature(this.tokenSKey.to_raw_key())
         const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('')
 
-        const submitTxResult = await this.backend.submitTx(signedTxHex, emailRecipients, this.userId)
+        const submitTxResult = await this.backend.submitTx(signedTxHex, txInfo.txRecipients, this.userId)
         this.activated = true
 
         return submitTxResult
