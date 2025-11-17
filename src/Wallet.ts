@@ -49,6 +49,10 @@ export class Wallet extends EventTarget  {
         window.location.href = authUrl
     }
 
+    public isActivated(): boolean {
+        return this.activated
+    }
+
     public isLoggedIn(): boolean {
         return this.jwt !== undefined && this.tokenSKey !== undefined && this.userId !== undefined
     }
