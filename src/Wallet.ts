@@ -49,6 +49,10 @@ export class Wallet extends EventTarget  {
         window.location.href = authUrl
     }
 
+    public isActivated(): boolean {
+        return this.activated
+    }
+
     public isLoggedIn(): boolean {
         return this.jwt !== undefined && this.tokenSKey !== undefined && this.userId !== undefined
     }
@@ -281,6 +285,12 @@ export class Wallet extends EventTarget  {
         return await this.getAddress()
     }
 
+    /**
+     * @async
+     * Send a transaction from this wallet.
+     *
+     * @param {TransactionRequest} request - Transaction request object
+     */
     public async sendTransaction(request: TransactionRequest): Promise<void> {
         this.dispatchEvent(new CustomEvent('transaction_initiated', { detail: this.hasProof() }))
 
@@ -399,13 +409,7 @@ export class Wallet extends EventTarget  {
         return await this.backend.prepareTx(params)
     }
 
-    /**
-     * Send funds from this wallet to a recipient.
-     *
-     * @async
-     * @param {SmartTxRecipient} rec - A recipient with a Cardano or a email address
-     */
-    public async sendTo(rec: SmartTxRecipient): Promise<SubmitTxResult> {
+    private async sendTo(rec: SmartTxRecipient): Promise<SubmitTxResult> {
         if (!this.userId || !this.tokenSKey || !this.jwt) {
             throw new Error('Wallet is not initialised')
         }

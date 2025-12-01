@@ -86,7 +86,7 @@ export class Prover {
             encrypted_payload: forge.util.bytesToHex(ivPlusCipher)
         }
 
-        const { data } = await axios.post(`${this.url}/v0/prove`, proveRequest, this.headers())
+        const { data } = await axios.post(`${this.url}/v0/prove-encrypted`, proveRequest, this.headers())
 
         return data
     }

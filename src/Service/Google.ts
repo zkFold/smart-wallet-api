@@ -17,6 +17,11 @@ export class GoogleApi {
         this.redirectURL = redirectURL
     }
 
+    /**
+     * Generates the Google OAuth2 authorization URL.
+     * @param {string} state - A unique state string to prevent CSRF attacks.
+     * @returns {string} The Google OAuth2 authorization URL.
+     */
     public getAuthUrl(state: string): string {
         // Example access scopes for Web2 login: user email is used.
         const scopes = [
@@ -37,6 +42,11 @@ export class GoogleApi {
         return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
     }
 
+    /**
+     * Exchanges an authorization code for a JWT.
+     * @param {string} code - The authorization code received from Google.
+     * @returns {Promise<string | null>} A promise that resolves to the JWT or null if not found.
+     */
     public async getJWTFromCode(code: string): Promise<string | null> {
         const tokenEndpoint = 'https://oauth2.googleapis.com/token'
 
@@ -61,6 +71,11 @@ export class GoogleApi {
         return data.id_token || null
     }
 
+    /**
+     * Fetches Google's public keys and returns the one matching the given key ID.
+     * @param {string} keyId - The key ID to match.
+     * @returns {Promise<GoogleCertKey | null>} A promise that resolves to the matching key or null if not found.
+     */
     public async getMatchingKey(keyId: string): Promise<GoogleCertKey | null> {
         const { data } = await axios.get<{ keys: GoogleCertKey[] }>('https://www.googleapis.com/oauth2/v3/certs')
 
@@ -74,23 +89,43 @@ export class GoogleApi {
         return null
     }
 
+    /**
+     * Extracts the key ID from a JWT.
+     * @param {string} jwt - The JWT string.
+     * @returns {string} The key ID.
+     */
     public getKeyId(jwt: string): string {
         const parts = jwt.split(".")
         const header = atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'))
         return JSON.parse(header).kid
     }
 
+    /**
+     * Extracts the user ID (email) from a JWT.
+     * @param {string} jwt - The JWT string.
+     * @returns {string} The user ID (email).
+     */
     public getUserId(jwt: string): string {
         const parts = jwt.split(".")
         const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
         return payload.email
     }
 
+    /**
+     * Extracts the signature from a JWT.
+     * @param {string} jwt - The JWT string.
+     * @returns {string} The signature.
+     */
     public getSignature(jwt: string): string {
         const parts = jwt.split(".")
         return parts[2].replace(/-/g, '+').replace(/_/g, '/')
     }
 
+    /**
+     * Strips the signature from a JWT.
+     * @param {string} jwt - The JWT string.
+     * @returns {string} The JWT without the signature.
+     */
     public stripSignature(jwt: string): string {
         const parts = jwt.split(".")
         return `${parts[0]}.${parts[1]}`

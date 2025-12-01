@@ -39,7 +39,7 @@ export class Backend {
      * @async
      * @returns {Settings}
      */
-    async settings(): Promise<Settings> {
+    public async settings(): Promise<Settings> {
         const { data } = await axios.get(`${this.url}/v0/settings`, this.headers())
         return data
     }
@@ -49,7 +49,7 @@ export class Backend {
      * @async
      * @returns {ClientCredentials}
      */
-    async credentials(): Promise<ClientCredentials> {
+    public async credentials(): Promise<ClientCredentials> {
         const { data } = await axios.get(`${this.url}/v0/oauth/credentials`, this.headers())
         return data
     }
@@ -60,7 +60,7 @@ export class Backend {
      * @param {string} email
      * @returns {CSL.Address}
      */
-    async walletAddress(email: string): Promise<CSL.Address> {
+    public async walletAddress(email: string): Promise<CSL.Address> {
         const { data } = await axios.post(`${this.url}/v0/wallet/address`, {
             'email': email
         }, this.headers())
@@ -77,7 +77,7 @@ export class Backend {
      * @param {ProofBytes} proof_bytes   - Zero-knowledge proof that the user possesses a valid JWT
      * @returns {CreateWalletResponse}
      */
-    async activateWallet(jwt: string, payment_key_hash: string, proof_bytes: ProofBytes): Promise<CreateWalletResponse> {
+    public async activateWallet(jwt: string, payment_key_hash: string, proof_bytes: ProofBytes): Promise<CreateWalletResponse> {
         const requestData = {
             'jwt': jwt,
             'payment_key_hash': payment_key_hash,
@@ -110,7 +110,7 @@ export class Backend {
      * @param {Output[]} outs            - Transaction outputs (where to send funds)
      * @returns {CreateWalletResponse}
      */
-    async activateAndSendFunds(jwt: string, payment_key_hash: string, proof_bytes: ProofBytes, outs: Output[]): Promise<CreateWalletResponse> {
+    public async activateAndSendFunds(jwt: string, payment_key_hash: string, proof_bytes: ProofBytes, outs: Output[]): Promise<CreateWalletResponse> {
         const requestData = {
             'jwt': jwt,
             'payment_key_hash': payment_key_hash,
@@ -143,7 +143,7 @@ export class Backend {
      * @param {string} payment_key_hash  - Token name (the hash of a public key used to initialise the wallet)
      * @returns {SendFundsResponse}
      */
-    async sendFunds(email: string, outs: Output[], payment_key_hash: string): Promise<SendFundsResponse> {
+    public async sendFunds(email: string, outs: Output[], payment_key_hash: string): Promise<SendFundsResponse> {
         const requestData = {
             'email': email,
             'outs': outs,
@@ -200,7 +200,7 @@ export class Backend {
      * @param {string[]} email_recipients
      * @returns {SubmitTxResult} - Transaction ID and email delivery errors, if any
      */
-    async submitTx(transaction: string, email_recipients: string[] = [], sender?: string): Promise<SubmitTxResult> {
+    public async submitTx(transaction: string, email_recipients: string[] = [], sender?: string): Promise<SubmitTxResult> {
         const { data } = await axios.post(`${this.url}/v0/tx/submit`, {
             email_recipients: email_recipients,
             sender: sender,
@@ -221,7 +221,7 @@ export class Backend {
      * @param {string[]} email_recipients
      * @returns {SubmitTxResult} - Transaction ID and email delivery errors, if any
      */
-    async addVkeyAndSubmitTx(unsigned_transaction: string, vkey_witness: string, email_recipients: string[] = [], sender?: string): Promise<SubmitTxResult> {
+    public async addVkeyAndSubmitTx(unsigned_transaction: string, vkey_witness: string, email_recipients: string[] = [], sender?: string): Promise<SubmitTxResult> {
         const { data } = await axios.post(`${this.url}/v0/tx/add-vkey-and-submit`, {
             unsigned_transaction: unsigned_transaction,
             vkey_witness: vkey_witness,
@@ -241,7 +241,7 @@ export class Backend {
      * @param {CSL.Address} address
      * @returns {UTxO[]}
      */
-    async addressUtxo(address: CSL.Address): Promise<UTxO[]> {
+    public async addressUtxo(address: CSL.Address): Promise<UTxO[]> {
         const { data } = await axios.post(`${this.url}/v0/address/utxos`, [address.to_bech32()], this.headers())
 
         const result: UTxO[] = []
@@ -277,7 +277,7 @@ export class Backend {
      * @param {CSL.Address} address
      * @returns {BalanceResponse}
      */
-    async balance(address: CSL.Address): Promise<BalanceResponse> {
+    public async balance(address: CSL.Address): Promise<BalanceResponse> {
         const { data } = await axios.post(`${this.url}/v0/address/balance`, address.to_bech32(), this.headers({ 'Content-Type': 'application/json' }))
         return data
     }
@@ -288,7 +288,7 @@ export class Backend {
      * @param {string} address
      * @returns {Transaction[]}
      */
-    async txHistory(email: string): Promise<Transaction[]> {
+    public async txHistory(email: string): Promise<Transaction[]> {
         const { data } = await axios.post(`${this.url}/v0/wallet/txs`, { 'email': email }, this.headers())
 
         console.log(data)
