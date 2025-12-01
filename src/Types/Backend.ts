@@ -52,11 +52,15 @@ export interface SendFundsResponse {
  *
  *  @property {string} email             - Wallet owner's email
  *  @property {string} payment_key_hash  - Hash of the Cardano payment key used for authentication
+ *  @property {string[]} collateral        - TxOutRef to collateral UTxOs (optional)
+ *  @property {number} change_index      - Position index of change-output in [TxOuts]; if abscent, defaults to last (optional)
  *  @property {string} transaction       - Partially constructed unsigned transaction (GYTx)
  */
 export interface PrepareTxParameters {
     email: string
     payment_key_hash: string
+    collateral?: string[] | null
+    change_index?: number | null
     transaction: string
 }
 

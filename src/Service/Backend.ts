@@ -175,7 +175,9 @@ export class Backend {
         const payload = serialize({
             'email': params.email,
             'payment_key_hash': params.payment_key_hash,
-            'transaction': params.transaction,
+	    'collateral': params.collateral,
+	    'change_index': params.change_index,
+            'transaction': params.transaction
         })
 
         const { data } = await axios.post(`${this.url}/v0/wallet/prepare-tx`, payload,
@@ -185,7 +187,7 @@ export class Backend {
         const response: PrepareTxResponse = {
             transaction: data.transaction,
             transaction_fee: data.transaction_fee,
-            transaction_id: data.transaction_id,
+            transaction_id: data.transaction_id
         }
 
         return response
