@@ -439,8 +439,10 @@ export class Wallet extends EventTarget  {
             while (!this.hasProof()) {
                 await delay(5_000)
             }
-            const resp = await this.backend.activateAndSendFunds(header + '.' + payload, pubkeyHex, this.proof as ProofBytes, outs)
+            //const resp = await this.backend.activateAndSendFunds(header + '.' + payload, pubkeyHex, this.proof as ProofBytes, outs)
+            const resp = await this.backend.activateWallet(header + '.' + payload, pubkeyHex, this.proof as ProofBytes)
             txHex = resp.transaction
+            console.log(`Submitted ts ${resp.transaction_id}`)
 
         }
         const transaction = CSL.FixedTransaction.from_bytes(hexToBytes(txHex))
