@@ -60,8 +60,22 @@ export class Backend {
      * @param {string} email
      * @returns {CSL.Address}
      */
-    public async walletAddress(email: string): Promise<CSL.Address> {
+    public async walletMainAddress(email: string): Promise<CSL.Address> {
         const { data } = await axios.post(`${this.url}/v0/wallet/address`, {
+            'email': email
+        }, this.headers())
+
+        return CSL.Address.from_bech32(data.address)
+    }
+
+    /**
+     * Return wallet's unused address. If the wallet has no transactions, it will coincide with the main address. 
+     * @async
+     * @param {string} email
+     * @returns {CSL.Address}
+     */
+    public async walletUnusedAddress(email: string): Promise<CSL.Address> {
+        const { data } = await axios.post(`${this.url}/v0/wallet/extra-address`, {
             'email': email
         }, this.headers())
 
@@ -249,8 +263,8 @@ export class Backend {
      * @param {CSL.Address} address
      * @returns {BalanceResponse}
      */
-    public async balance(address: CSL.Address): Promise<BalanceResponse> {
-        const { data } = await axios.post(`${this.url}/v0/address/balance`, address.to_bech32(), this.headers({ 'Content-Type': 'application/json' }))
+    public async balance(email: string): Promise<BalanceResponse> {
+        const { data } = await axios.post(`${this.url}/v0/address/balance`, email, this.headers({ 'Content-Type': 'application/json' }))
         return data
     }
 
@@ -263,8 +277,6 @@ export class Backend {
     public async txHistory(email: string): Promise<Transaction[]> {
         const { data } = await axios.post(`${this.url}/v0/wallet/txs`, { 'email': email }, this.headers())
 
-        console.log(data)
-        
         // TODO: fetch token tickers from Cardano Token Registry if it isn't done on the back end
         // 
         return data.map((tx: any) => {
