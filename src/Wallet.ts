@@ -173,8 +173,9 @@ export class Wallet extends EventTarget  {
      * Get the Cardano address for a gmail address
      */
     public async addressForGmail(gmail: string): Promise<CSL.Address> {
-        return await this.backend.walletAddress(gmail)
+        return await this.backend.walletMainAddress(gmail)
     }
+
 
     /**
      * @async
@@ -189,11 +190,24 @@ export class Wallet extends EventTarget  {
 
     /**
      * @async
+     * Get an unused address for the wallet 
+     */
+    public async getUnusedAddress(): Promise<CSL.Address> {
+        if (!this.userId) {
+            throw new Error('Wallet is not initialised')
+        }
+        return await this.backend.walletUnusedAddress(this.userId)
+    }
+
+    /**
+     * @async
      * Get wallet's balance as an object with asset names as property names and amounts as their values.
      */
     public async getBalance(): Promise<BalanceResponse> {
-        const address = await this.getAddress()
-        const balance = await this.backend.balance(address)
+        if (!this.userId) {
+            throw new Error('Wallet is not initialised')
+        }
+        const balance = await this.backend.balance(this.userId)
         return balance
     }
 
