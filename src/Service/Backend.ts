@@ -173,12 +173,6 @@ export class Backend {
      */
     async prepareTx(params: PrepareTxParameters): Promise<PrepareTxResponse> {
         const payload = serialize(params)
-            'email': params.email,
-            'payment_key_hash': params.payment_key_hash,
-	    'collateral': params.collateral,
-	    'change_index': params.change_index,
-            'transaction': params.transaction
-        })
 
         const { data } = await axios.post(`${this.url}/v0/wallet/prepare-tx`, payload,
             this.headers({ 'Content-Type': 'application/json' })
