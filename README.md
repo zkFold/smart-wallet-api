@@ -28,39 +28,23 @@ npm run build
 
 The flow below shows how to obtain Google OAuth credentials, initialise a wallet, and prepare the background proof required for first-time spending.
 
-### 1. Initiate the Google OAuth flow
+### 1. Initiate the Google OAuth flow, Backend service and Prover service
 
 ```typescript
-import { Backend, GoogleApi } from 'zkfold-smart-wallet-api';
+import { Backend, GoogleApi, Prover } from 'zkfold-smart-wallet-api'
 
-// Optionally pass an API key as the second argument if your backend requires it
-const backend = new Backend('https://wallet-api.zkfold.io', 'your-api-key');
-const credentials = await backend.credentials();
+const backend = new Backend("https://wallet-api.zkfold.io", YOUR-BACKEND-API-KEY)
+const prover = new Prover("https://wallet-prover.zkfold.io")
 
-const gapi = new GoogleApi(
-    credentials.client_id,
-    credentials.client_secret,
-    'https://your-app.com/oauth/callback'
-);
-
-const authUrl = gapi.getAuthUrl('random-state');
-window.location.href = authUrl;
+const googleApi = new GoogleApi(YOUR-GOOGLE-CLIENT-ID, YOUR-GOOGLE-CLIENT-SECRET, `${YOUR-WEBSITE-URL}/oauth2callback`)
 ```
 
-### 2. Handle the OAuth callback and create a wallet
+You should also setup the callback address in the Google Cloud console to be `${YOUR-WEBSITE-URL}/oauth2callback`
+
+### 2. Create a wallet
 
 ```typescript
-import { Prover, Wallet } from 'zkfold-smart-wallet-api';
-
-const params = new URLSearchParams(window.location.search);
-const code = params.get('code');
-if (!code) throw new Error('Missing OAuth code');
-
-const jwt = await gapi.getJWT(code);
-if (!jwt) throw new Error('JWT exchange failed');
-
-const prover = new Prover('https://wallet-prover.zkfold.io');
-const wallet = new Wallet(backend, prover, { jwt });
+const wallet = new Wallet(backend, prover, googleApi)
 ```
 
 If you need to persist the wallet between sessions, serialise the initialiser:
@@ -151,11 +135,6 @@ Used to fetch zero-knowledge proofs for Google JWT validation:
 - `requestProof(proofInput)` – Submit proof computation and get a request ID
 - `proofStatus(proofId)` – Poll for proof completion
 - `prove(proofInput)` – Convenience helper that internally polls until the proof is ready
-
-### GoogleApi
-
-- `getAuthUrl(state)` – Start the OAuth 2.0 authorization code flow
-- `getJWT(code)` – Exchange the authorization code for an ID token (JWT)
 
 ### Serialization helpers
 
