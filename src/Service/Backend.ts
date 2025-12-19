@@ -172,7 +172,7 @@ export class Backend {
      * @returns {PrepareTxResponse}
      */
     async prepareTx(params: PrepareTxParameters): Promise<PrepareTxResponse> {
-        const payload = serialize({
+        const payload = serialize(params)
             'email': params.email,
             'payment_key_hash': params.payment_key_hash,
 	    'collateral': params.collateral,
