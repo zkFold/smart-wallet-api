@@ -1,6 +1,6 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, BalanceResponse, Transaction } from './Types'
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, BalanceResponse, Transaction, PrepareTxParameters, PrepareTxResponse } from './Types'
 import { Prover } from './Service/Prover'
 import { b64ToBn, harden, hexToBytes } from './Utils'
 import { Storage } from './Service/Storage'
@@ -401,6 +401,26 @@ export class Wallet extends EventTarget  {
             console.error('Failed to check transaction status:', error)
             return { outcome: "failure", reason: error }
         }
+    }
+
+    /**
+     * Prepare a partially constructed transaction with Smart Wallet witnesses.
+     *
+     * @async
+     * @param {string} transaction - Unsigned GYTx prepared by the client
+     */
+    public async prepareTransaction(transaction: string): Promise<PrepareTxResponse> {
+        if (!this.userId || !this.tokenSKey) {
+            throw new Error('Wallet is not initialised')
+        }
+
+        const params: PrepareTxParameters = {
+            email: this.userId,
+            payment_key_hash: this.tokenSKey.to_public().to_raw_key().hash().to_hex(),
+            transaction: transaction,
+        }
+
+        return await this.backend.prepareTx(params)
     }
 
     private async sendTo(rec: SmartTxRecipient): Promise<SubmitTxResult> {

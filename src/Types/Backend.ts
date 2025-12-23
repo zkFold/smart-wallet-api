@@ -48,6 +48,36 @@ export interface SendFundsResponse {
 }
 
 /**
+ *  Request parameters for the /wallet/prepare-tx endpoint
+ *
+ *  @property {string} email             - Wallet owner's email
+ *  @property {string} payment_key_hash  - Hash of the Cardano payment key used for authentication
+ *  @property {string[]} collateral        - TxOutRef to collateral UTxOs (optional)
+ *  @property {number} change_index      - Position index of change-output in [TxOuts]; if abscent, defaults to last (optional)
+ *  @property {string} transaction       - Partially constructed unsigned transaction (GYTx)
+ */
+export interface PrepareTxParameters {
+    email: string
+    payment_key_hash: string
+    collateral?: string[] | null
+    change_index?: number | null
+    transaction: string
+}
+
+/**
+ *  Response from the /wallet/prepare-tx endpoint
+ *
+ *  @property {string} transaction       - Updated unsigned transaction including Smart Wallet witnesses
+ *  @property {number} transaction_fee   - Recalculated fee after auto-balancing
+ *  @property {string} transaction_id    - Hash of the modified transaction body
+ */
+export interface PrepareTxResponse {
+    transaction: string
+    transaction_fee: number
+    transaction_id: string
+}
+
+/**
  *  Transaction ID and email delivery errors, if any 
  *
  * @property {string}      transaction_id         - Transaction ID 

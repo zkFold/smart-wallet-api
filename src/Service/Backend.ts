@@ -1,7 +1,7 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import axios from 'axios';
 import { serialize } from '../JSON';
-import { BigIntWrap, ProofBytes, Output, Reference, UTxO, CreateWalletResponse, SendFundsResponse, SubmitTxResult, ClientCredentials, Settings, BalanceResponse, Transaction } from '../Types'
+import { BigIntWrap, ProofBytes, Output, Reference, UTxO, CreateWalletResponse, SendFundsResponse, PrepareTxParameters, PrepareTxResponse, SubmitTxResult, ClientCredentials, Settings, BalanceResponse, Transaction } from '../Types'
 
 /**
  * A wrapper for interaction with the backend.
@@ -171,6 +171,28 @@ export class Backend {
         )
 
         const response: SendFundsResponse = {
+            transaction: data.transaction,
+            transaction_fee: data.transaction_fee,
+            transaction_id: data.transaction_id
+        }
+
+        return response
+    }
+
+    /**
+     * Prepare a Smart Wallet transaction by augmenting it with mandatory witnesses.
+     * @async
+     * @param {PrepareTxParameters} params - Request parameters for the prepare-tx endpoint
+     * @returns {PrepareTxResponse}
+     */
+    async prepareTx(params: PrepareTxParameters): Promise<PrepareTxResponse> {
+        const payload = serialize(params)
+
+        const { data } = await axios.post(`${this.url}/v0/wallet/prepare-tx`, payload,
+            this.headers({ 'Content-Type': 'application/json' })
+        )
+
+        const response: PrepareTxResponse = {
             transaction: data.transaction,
             transaction_fee: data.transaction_fee,
             transaction_id: data.transaction_id
