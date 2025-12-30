@@ -18,7 +18,7 @@ export class Wallet extends EventTarget  {
     private proof: ProofBytes | null = null
 
     private storage: Storage
-    private session: Session
+    public session: Session
     private googleApi: GoogleApi
     private backend: Backend
     private prover: Prover
@@ -37,8 +37,7 @@ export class Wallet extends EventTarget  {
         this.prover = prover
     }
 
-    public login(): void {
-        // Generate state for OAuth flow
+    public createUrl(): [string, string] {
         const array = new Uint8Array(32)
         crypto.getRandomValues(array)
         const state = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
@@ -46,7 +45,11 @@ export class Wallet extends EventTarget  {
 
         // Redirect to Google OAuth
         const authUrl = this.googleApi.getAuthUrl(state)
-        window.location.href = authUrl
+        return [state, authUrl]
+    }
+
+    public login(): void {
+        window.location.href = this.createUrl()[1]
     }
 
     public isActivated(): boolean {
@@ -129,7 +132,7 @@ export class Wallet extends EventTarget  {
                 .derive(0)
             this.tokenSKey = prvKey
             this.activated = false
-            this.getProof()
+            // this.getProof()
         }
 
         // Dispatch wallet initialised event
