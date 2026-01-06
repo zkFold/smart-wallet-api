@@ -56,3 +56,19 @@ export function b64ToBn(b64: string): BigIntWrap {
 
     return new BigIntWrap(BigInt('0x' + hex.join('')))
 }
+
+
+// binary exponentiation with remainder calculation on each step to prevent memory blowup
+export function expMod(base: bigint, exponent: bigint, modulus: bigint): bigint {
+    if (modulus === 1n) return 0n;
+    let result = 1n;
+    base = base % modulus; 
+    while (exponent > 0n) {
+        if ((exponent & 1n) === 1n) {
+            result = (result * base) % modulus;
+        }
+        exponent >>= 1n; 
+        base = (base * base) % modulus; 
+    }
+    return result;
+}

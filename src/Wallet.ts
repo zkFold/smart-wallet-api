@@ -1,8 +1,9 @@
+import forge from 'node-forge';
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, BalanceResponse, Transaction, PrepareTxParameters, PrepareTxResponse } from './Types'
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, PlonkProofInput, SigmaProofInput, SigmaProof, SmartTxRecipient, BalanceResponse, Transaction, PrepareTxParameters, PrepareTxResponse } from './Types'
 import { Prover } from './Service/Prover'
-import { b64ToBn, harden, hexToBytes } from './Utils'
+import { bytesToBase64Url, b64ToBn, harden, hexToBytes, expMod } from './Utils'
 import { Storage } from './Service/Storage'
 import { Session } from './Service/Session'
 import { GoogleApi } from './Service/Google'
@@ -21,20 +22,42 @@ export class Wallet extends EventTarget  {
     private session: Session
     private googleApi: GoogleApi
     private backend: Backend
-    private prover: Prover
+    private prover?: Prover
+    private apiVersion: number
+
+    // Disallow instantiating Wallet via constructor
+    private constructor() {
+        super()
+    }
 
     /**
      *  @param {Backend} backend                 - A Backend object for interaction with the backend
      *  @param {Prover} prover                   - A Prover object for interaction with the prover
      *  @param {GoogleApi} googleApi             - A GoogleApi object for interaction with Google OAuth
      */
-    constructor(backend: Backend, prover: Prover, googleApi: GoogleApi) {
-        super()
-        this.storage = new Storage()
-        this.session = new Session()
-        this.googleApi = googleApi
-        this.backend = backend
-        this.prover = prover
+    public static withV0Api(backend: Backend, prover: Prover, googleApi: GoogleApi) {
+        const wallet = new Wallet()
+        wallet.storage = new Storage()
+        wallet.session = new Session()
+        wallet.googleApi = googleApi
+        wallet.backend = backend
+        wallet.prover = prover
+        wallet.apiVersion = 0
+        return wallet
+    }
+
+    /**
+     *  @param {Backend} backend                 - A Backend object for interaction with the backend
+     *  @param {GoogleApi} googleApi             - A GoogleApi object for interaction with Google OAuth
+     */
+    public static withV1Api(backend: Backend, googleApi: GoogleApi) {
+        const wallet = new Wallet()
+        wallet.storage = new Storage()
+        wallet.session = new Session()
+        wallet.googleApi = googleApi
+        wallet.backend = backend
+        wallet.apiVersion = 1
+        return wallet
     }
 
     public login(): void {
@@ -137,28 +160,81 @@ export class Wallet extends EventTarget  {
     }
 
     private async getProof(): Promise<void> {
-        if (!this.jwt || !this.tokenSKey) {
+        if (!this.jwt) {
             throw new Error('Wallet is not initialised')
         }
 
-        const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex()
         const keyId = this.googleApi.getKeyId(this.jwt)
         const matchingKey = await this.googleApi.getMatchingKey(keyId)
         if (!matchingKey) {
             throw new Error(`Failed to find matching Google cert for key ${keyId}`)
         }
         const signature = this.googleApi.getSignature(this.jwt)
-        const empi: ProofInput = {
-            piPubE: b64ToBn(matchingKey.e),
-            piPubN: b64ToBn(matchingKey.n),
-            piSignature: b64ToBn(signature),
-            piTokenName: new BigIntWrap("0x" + pubkeyHex)
+        if (this.apiVersion == 0 && this.prover) {
+            if (!this.tokenSKey) {
+                throw new Error('Wallet is not initialised')
+            }
+
+            const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex()
+
+            const empi: PlonkProofInput = {
+                piPubE: b64ToBn(matchingKey.e),
+                piPubN: b64ToBn(matchingKey.n),
+                piSignature: b64ToBn(signature),
+                piTokenName: new BigIntWrap("0x" + pubkeyHex)
+            }
+
+            this.jwt = this.googleApi.stripSignature(this.jwt)
+            this.proof = await this.prover.prove(empi)
+        } else if (this.apiVersion == 1) {
+            const sigmaProofInput: SigmaProofInput = {
+                piPubE: b64ToBn(matchingKey.e),
+                piPubN: b64ToBn(matchingKey.n),
+                piSignature: b64ToBn(signature),
+            }
+
+            this.proof = this.sigmaProve(empi)
         }
 
-        this.jwt = this.googleApi.stripSignature(this.jwt)
-        this.proof = await this.prover.prove(empi)
-
         this.dispatchEvent(new CustomEvent('proof_computed'))
+    }
+
+    private digest(data: bigint[], mod: bigint): bigint {
+        let s = ''
+        for (let i = 0; i < data.length; i++) {
+            s += data[i]
+        }
+
+        const md = forge.md.sha256.create();
+        md.update(s); 
+        return BigInt('0x' + md.digest().toHex()) % mod 
+    }
+
+    private sigmaProve(input: SigmaProofInput): SigmaProof {
+        const n = input.piPubN.toBigInt()
+        const s = input.piSignature.toBigInt()
+        const e = input.piPubE.toBigInt()
+        const c = expMod(s, e, n)
+        
+        // Share-in-Mind(s): picks a random element a ∈ Z_N, 
+        // defines a function f (x) = a · s^x mod N ,
+        // sets SHcpt = a, computes aut = a^e mod N ,
+        // outputs (SHcpt, aut);
+        const a = b64ToBn(bytesToBase64Url(forge.random.getBytesSync(256))).toBigInt() % n // 256 bytes = 2048 bits, size of the keys
+        const aut = expMod(a, e, n)
+
+        const i = this.digest([c, aut], e) // Fiat-Shamir transform -- use digest instead of a random element
+
+        //Distribute(s, SHcpt, i): parses SHcpt = a,
+        //computes si = a · s^i mod N ,
+        //outputs vi = si.
+
+        const v = [(a * expMod(s, i, n)) % n]
+
+        return {
+            vi: v,
+            aut: aut,
+        } as SigmaProof
     }
 
     public getUserId(): string {

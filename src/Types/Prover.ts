@@ -73,3 +73,27 @@ export interface ProofInput {
     piSignature: BigIntWrap
     piTokenName: BigIntWrap
 }
+
+/**
+ *  Sigma protocols proof input 
+ *
+ *  @property {BigIntWrap}      piPubE         - Google's RSA public exponent 
+ *  @property {BigIntWrap}      piPubN         - Google's RSA public modulus
+ *  @property {BigIntWrap}      piSignature    - Signature attached to the Google OAuth JSON Web Token
+ */
+export interface SigmaProofInput {
+    piPubE: BigIntWrap
+    piPubN: BigIntWrap
+    piSignature: BigIntWrap
+}
+
+/**
+ *  Sigma protocols proof
+ *
+ *  @property {BigIntWrap[]}      vi          - Verifier's shares
+ *  @property {BigIntWrap}        aut         - Authentication element
+ */
+export interface SigmaProof {
+    vi:  BigIntWrap
+    aut: BigIntWrap
+}
