@@ -67,7 +67,7 @@ export interface ProverPublicKey {
  *  @property {BigIntWrap}      piSignature    - Signature attached to the Google OAuth JSON Web Token
  *  @property {BigIntWrap}      piTokenName    - The name of the token minted in the wallet initialisation transaction
  */
-export interface ProofInput {
+export interface PlonkProofInput {
     piPubE: BigIntWrap
     piPubN: BigIntWrap
     piSignature: BigIntWrap
@@ -90,10 +90,10 @@ export interface SigmaProofInput {
 /**
  *  Sigma protocols proof
  *
- *  @property {BigIntWrap[]}      vi          - Verifier's shares
- *  @property {BigIntWrap}        aut         - Authentication element
+ *  @property {BigIntWrap[]}      v           - Verifier's shares
+ *  @property {BigIntWrap[]}      aut         - Authentication elements
  */
 export interface SigmaProof {
-    vi:  BigIntWrap
-    aut: BigIntWrap
+    v:   BigIntWrap[]
+    aut: BigIntWrap[]
 }

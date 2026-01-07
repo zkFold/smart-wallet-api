@@ -1,6 +1,6 @@
 import axios from 'axios';
 import forge from 'node-forge';
-import { ProofBytes, ProverPublicKey, ProofInput, BigIntWrap } from '../Types';
+import { ProofBytes, ProverPublicKey, PlonkProofInput, BigIntWrap } from '../Types';
 import { deserialize, serialize } from '../JSON';
 
 /**
@@ -41,10 +41,10 @@ export class Prover {
     /**
      * Submit a proof request to the Prover. It will return a Request ID which can be used to retrieve proof status
      * @async
-     * @param {ProofInput} proofInput for the expMod circuit: exponent, modulus, signature and token name
+     * @param {PlonkProofInput} proofInput for the expMod circuit: exponent, modulus, signature and token name
      * @returns {string} proof request ID
      */
-    public async requestProof(proofInput: ProofInput): Promise<string> {
+    public async requestProof(proofInput: PlonkProofInput): Promise<string> {
         const keys = await this.serverKeys()
 
         const key = keys[0]
@@ -108,10 +108,10 @@ export class Prover {
     /**
      * Obtain a Proof from the Prover. Unlike requestProof(), this method waits for the proof completion 
      * @async
-     * @param {ProofInput} proofInput for the expMod circuit: exponent, modulus, signature and token name
+     * @param {PlonkProofInput} proofInput for the expMod circuit: exponent, modulus, signature and token name
      * @returns {ProofBytes} ZK proof bytes for the expMod circuit
      */
-    public async prove(proofInput: ProofInput): Promise<ProofBytes> {
+    public async prove(proofInput: PlonkProofInput): Promise<ProofBytes> {
         const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
         const proofId = await this.requestProof(proofInput)
 

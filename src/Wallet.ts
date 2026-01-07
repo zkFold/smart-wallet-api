@@ -16,18 +16,20 @@ export class Wallet extends EventTarget  {
     private tokenSKey?: CSL.Bip32PrivateKey
     private userId?: string
     private activated: boolean = false
-    private proof: ProofBytes | null = null
+    private proof: ProofBytes | SigmaProof | null = null
 
     private storage: Storage
     private session: Session
-    private googleApi: GoogleApi
-    private backend: Backend
+    private googleApi?: GoogleApi
+    private backend?: Backend
     private prover?: Prover
-    private apiVersion: number
+    private apiVersion: number = 0
 
     // Disallow instantiating Wallet via constructor
     private constructor() {
         super()
+        this.storage = new Storage()
+        this.session = new Session()
     }
 
     /**
@@ -37,12 +39,11 @@ export class Wallet extends EventTarget  {
      */
     public static withV0Api(backend: Backend, prover: Prover, googleApi: GoogleApi) {
         const wallet = new Wallet()
-        wallet.storage = new Storage()
-        wallet.session = new Session()
         wallet.googleApi = googleApi
         wallet.backend = backend
         wallet.prover = prover
         wallet.apiVersion = 0
+        wallet.backend.setApiVersion(wallet.apiVersion)
         return wallet
     }
 
@@ -52,11 +53,10 @@ export class Wallet extends EventTarget  {
      */
     public static withV1Api(backend: Backend, googleApi: GoogleApi) {
         const wallet = new Wallet()
-        wallet.storage = new Storage()
-        wallet.session = new Session()
         wallet.googleApi = googleApi
         wallet.backend = backend
         wallet.apiVersion = 1
+        wallet.backend.setApiVersion(wallet.apiVersion)
         return wallet
     }
 
@@ -68,7 +68,7 @@ export class Wallet extends EventTarget  {
         this.session.saveState(state)
 
         // Redirect to Google OAuth
-        const authUrl = this.googleApi.getAuthUrl(state)
+        const authUrl = this.googleApi!.getAuthUrl(state)
         window.location.href = authUrl
     }
 
@@ -77,7 +77,12 @@ export class Wallet extends EventTarget  {
     }
 
     public isLoggedIn(): boolean {
-        return this.jwt !== undefined && this.tokenSKey !== undefined && this.userId !== undefined
+        if (this.apiVersion === 0) {
+            return this.jwt !== undefined && this.tokenSKey !== undefined && this.userId !== undefined
+        } else if (this.apiVersion === 1) {
+            return this.jwt !== undefined && this.userId !== undefined
+        }
+        return false
     }
 
     public hasProof(): boolean {
@@ -122,13 +127,13 @@ export class Wallet extends EventTarget  {
         }
 
         // Get JWT token
-        const jwt = await this.googleApi.getJWTFromCode(code)
+        const jwt = await this.googleApi!.getJWTFromCode(code)
         if (!jwt) {
             throw new Error('Failed to get JWT from authorization code')
         }
 
         // Set user ID
-        this.userId = this.googleApi.getUserId(jwt)
+        this.userId = this.googleApi!.getUserId(jwt)
         // Get Cardano address
         const address = await this.addressForGmail(this.userId).then((x: any) => x.to_bech32())
         
@@ -164,12 +169,12 @@ export class Wallet extends EventTarget  {
             throw new Error('Wallet is not initialised')
         }
 
-        const keyId = this.googleApi.getKeyId(this.jwt)
-        const matchingKey = await this.googleApi.getMatchingKey(keyId)
+        const keyId = this.googleApi!.getKeyId(this.jwt)
+        const matchingKey = await this.googleApi!.getMatchingKey(keyId)
         if (!matchingKey) {
             throw new Error(`Failed to find matching Google cert for key ${keyId}`)
         }
-        const signature = this.googleApi.getSignature(this.jwt)
+        const signature = this.googleApi!.getSignature(this.jwt)
         if (this.apiVersion == 0 && this.prover) {
             if (!this.tokenSKey) {
                 throw new Error('Wallet is not initialised')
@@ -184,7 +189,7 @@ export class Wallet extends EventTarget  {
                 piTokenName: new BigIntWrap("0x" + pubkeyHex)
             }
 
-            this.jwt = this.googleApi.stripSignature(this.jwt)
+            this.jwt = this.googleApi!.stripSignature(this.jwt)
             this.proof = await this.prover.prove(empi)
         } else if (this.apiVersion == 1) {
             const sigmaProofInput: SigmaProofInput = {
@@ -193,7 +198,7 @@ export class Wallet extends EventTarget  {
                 piSignature: b64ToBn(signature),
             }
 
-            this.proof = this.sigmaProve(empi)
+            this.proof = this.sigmaProve(sigmaProofInput)
         }
 
         this.dispatchEvent(new CustomEvent('proof_computed'))
@@ -211,29 +216,43 @@ export class Wallet extends EventTarget  {
     }
 
     private sigmaProve(input: SigmaProofInput): SigmaProof {
+        const iterations = 16
+
         const n = input.piPubN.toBigInt()
         const s = input.piSignature.toBigInt()
         const e = input.piPubE.toBigInt()
         const c = expMod(s, e, n)
         
-        // Share-in-Mind(s): picks a random element a ∈ Z_N, 
-        // defines a function f (x) = a · s^x mod N ,
-        // sets SHcpt = a, computes aut = a^e mod N ,
-        // outputs (SHcpt, aut);
-        const a = b64ToBn(bytesToBase64Url(forge.random.getBytesSync(256))).toBigInt() % n // 256 bytes = 2048 bits, size of the keys
-        const aut = expMod(a, e, n)
 
-        const i = this.digest([c, aut], e) // Fiat-Shamir transform -- use digest instead of a random element
+        const auts = []
+        const v = []
 
-        //Distribute(s, SHcpt, i): parses SHcpt = a,
-        //computes si = a · s^i mod N ,
-        //outputs vi = si.
 
-        const v = [(a * expMod(s, i, n)) % n]
+
+        for (let iter = 0; iter < iterations; ++iter) {
+            // Share-in-Mind(s): picks a random element a ∈ Z_N, 
+            // defines a function f (x) = a · s^x mod N ,
+            // sets SHcpt = a, computes aut = a^e mod N ,
+            // outputs (SHcpt, aut);
+            const bytes = Uint8Array.from(forge.random.getBytesSync(256).split("").map(x => x.charCodeAt(0))) // 256 bytes = 2048 bits, size of the keys
+            const a = b64ToBn(bytesToBase64Url(bytes)).toBigInt() % n 
+            const aut = expMod(a, e, n)
+
+            const i = this.digest([c, aut], e) // Fiat-Shamir transform -- use digest instead of a random element
+
+            //Distribute(s, SHcpt, i): parses SHcpt = a,
+            //computes si = a · s^i mod N ,
+            //outputs vi = si.
+
+            const vi = (a * expMod(s, i, n)) % n
+
+            auts.push(new BigIntWrap(aut))
+            v.push(new BigIntWrap(vi))
+        }
 
         return {
-            vi: v,
-            aut: aut,
+            v: v,
+            aut: auts,
         } as SigmaProof
     }
 
@@ -249,7 +268,7 @@ export class Wallet extends EventTarget  {
      * Get the Cardano address for a gmail address
      */
     public async addressForGmail(gmail: string): Promise<CSL.Address> {
-        return await this.backend.walletMainAddress(gmail)
+        return await this.backend!.walletMainAddress(gmail)
     }
 
 
@@ -272,7 +291,7 @@ export class Wallet extends EventTarget  {
         if (!this.userId) {
             throw new Error('Wallet is not initialised')
         }
-        return await this.backend.walletUnusedAddress(this.userId)
+        return await this.backend!.walletUnusedAddress(this.userId)
     }
 
     /**
@@ -283,7 +302,7 @@ export class Wallet extends EventTarget  {
         if (!this.userId) {
             throw new Error('Wallet is not initialised')
         }
-        const balance = await this.backend.balance(this.userId)
+        const balance = await this.backend!.balance(this.userId)
         return balance
     }
 
@@ -304,7 +323,7 @@ export class Wallet extends EventTarget  {
         if (!this.userId) {
             throw new Error('Wallet is not initialised')
         }
-        return await this.backend.txHistory(this.userId) 
+        return await this.backend!.txHistory(this.userId) 
     }
 
     /**
@@ -322,7 +341,7 @@ export class Wallet extends EventTarget  {
         const address = await this.getAddress()
         let utxos: UTxO[] = []
         try {
-            utxos = await this.backend.addressUtxo(address)
+            utxos = await this.backend!.addressUtxo(address)
         } catch (err) {
             console.log("getUtxos()")
             console.log(err)
@@ -464,7 +483,7 @@ export class Wallet extends EventTarget  {
     private async checkTransactionStatus(txId: string, recipient: string): Promise<any> {
         try {
             const address = CSL.Address.from_bech32(recipient)
-            const utxos = await this.backend.addressUtxo(address)
+            const utxos = await this.backend!.addressUtxo(address)
 
             for (const utxo of utxos) {
                 if ((utxo as any).ref.transaction_id === txId) {
@@ -496,7 +515,7 @@ export class Wallet extends EventTarget  {
             transaction: transaction,
         }
 
-        return await this.backend.prepareTx(params)
+        return await this.backend!.prepareTx(params)
     }
 
     private async sendTo(rec: SmartTxRecipient): Promise<SubmitTxResult> {
@@ -538,7 +557,7 @@ export class Wallet extends EventTarget  {
         const outs: Output[] = [{ address: recipientAddress.to_bech32(), value: rec.assets }]
 
         if (this.activated) {
-            const resp = await this.backend.sendFunds(this.userId, outs, this.tokenSKey.to_public().to_raw_key().hash().to_hex())
+            const resp = await this.backend!.sendFunds(this.userId, outs, this.tokenSKey.to_public().to_raw_key().hash().to_hex())
             txHex = resp.transaction
         } else {
             const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex()
@@ -549,7 +568,7 @@ export class Wallet extends EventTarget  {
             while (!this.hasProof()) {
                 await delay(5_000)
             }
-            const resp = await this.backend.activateAndSendFunds(header + '.' + payload, pubkeyHex, this.proof as ProofBytes, outs)
+            const resp = await this.backend!.activateAndSendFunds(header + '.' + payload, pubkeyHex, this.proof as ProofBytes, outs)
             txHex = resp.transaction
 
         }
@@ -557,7 +576,7 @@ export class Wallet extends EventTarget  {
         transaction.sign_and_add_vkey_signature(this.tokenSKey.to_raw_key())
         const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('')
 
-        const submitTxResult = await this.backend.submitTx(signedTxHex, emailRecipients, this.userId)
+        const submitTxResult = await this.backend!.submitTx(signedTxHex, emailRecipients, this.userId)
         this.activated = true
 
         return submitTxResult
