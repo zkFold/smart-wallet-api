@@ -11,9 +11,7 @@ import { AbstractWallet } from './AbstractWallet'
 /**
  * The Wallet which can be initialised with an email address.
  */
-export class Wallet extends AbstractWallet {
-    public storage: Storage
-    public session: Session
+export class PopupWallet extends AbstractWallet {
 
     /**
      *  @param {Backend} backend                 - A Backend object for interaction with the backend
@@ -22,31 +20,36 @@ export class Wallet extends AbstractWallet {
      */
     constructor(backend: Backend, prover: Prover, googleApi: GoogleApi) {
         super(backend, prover, googleApi)
-        this.storage = new Storage()
-        this.session = new Session()
-    }
-
-    public createUrl(): [string, string] {
-        const array = new Uint8Array(32)
-        crypto.getRandomValues(array)
-        const state = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
-        this.session.saveState(state)
-
-        // Redirect to Google OAuth
-        const authUrl = this.googleApi.getAuthUrl(state)
-        return [state, authUrl]
     }
 
     public login(): void {
-        window.location.href = this.createUrl()[1]
+        // window.location.href = this.createUrl()[1]
+        chrome.runtime.sendMessage({
+            action: 'AUTH'
+        }).catch((error) => {
+            console.error("Error sending message to background script:", error);
+        });
     }
 
     protected getWallet(addr: string): Promise<WalletInitialiser | null> {
-        return Promise.resolve(this.storage.getWallet(addr));
-    }   
+        return chrome.storage.local.get(['walletStorage']).then((res) => {
+            const wallets = res?.walletStorage as { [addr: string]: WalletInitialiser } | undefined;
+            console.log("Retrieved wallets from storage:", wallets);
+            return wallets?.[addr] ?? null;
+        });
+    }
 
     protected saveWallet(addr: string, wallet: WalletInitialiser): void {
-        this.storage.saveWallet(addr, wallet);
+        chrome.storage.local.get(['walletStorage'], (res) => {
+            const version = res.version;
+            let wallets = res.wallets as { [addr: string]: WalletInitialiser };
+            wallets[addr] = wallet;
+            chrome.storage.local.set({
+                version: version,
+                walletStorage: wallets
+            })
+        })
+
     }
 
     public logout(): void {
@@ -57,7 +60,7 @@ export class Wallet extends AbstractWallet {
         this.proof = null
 
         // Clear any session data
-        sessionStorage.clear()
+        chrome.storage.local.clear();
 
         // Dispatch logout event
         this.dispatchEvent(new CustomEvent('logged_out'))
