@@ -17,6 +17,16 @@ export default defineConfig({
       formats: ['es', 'umd', 'iife'],
       fileName: (format) => `smart-wallet-api.${format}.js`
     },
+    rollupOptions: {
+      external: [
+        '@emurgo/cardano-serialization-lib-asmjs'
+      ],
+      output: {
+        globals: {
+          '@emurgo/cardano-serialization-lib-asmjs': 'CardanoWasm'
+        }
+      }
+    },
     target: 'es2020',
     minify: 'terser'
   },
