@@ -1,4 +1,4 @@
-import * as CSL from '@emurgo/cardano-serialization-lib-browser';
+import * as CSL from '@emurgo/cardano-serialization-lib-asmjs';
 import axios from 'axios';
 import { serialize } from '../JSON';
 import { BigIntWrap, ProofBytes, Output, Reference, UTxO, CreateWalletResponse, SendFundsResponse, SubmitTxResult, ClientCredentials, Settings, BalanceResponse, Transaction } from '../Types'

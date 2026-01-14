@@ -1,4 +1,4 @@
-import * as CSL from '@emurgo/cardano-serialization-lib-browser'
+import * as CSL from '@emurgo/cardano-serialization-lib-asmjs'
 
 /**
  * Wrapper for various integer types used in communication with the Backend, Prover, and CSL.

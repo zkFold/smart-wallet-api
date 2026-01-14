@@ -44,19 +44,24 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
     public abstract login(): void;
     public abstract logout(): void;
     protected abstract saveWallet(addr: string, wallet: WalletInitialiser): void;
+    protected abstract saveState(state: string): void;
     protected abstract getWallet(addr: string): Promise<WalletInitialiser | null>;
+    protected abstract oauthCallback(callbackData: string): Promise<void>;
 
-    public createUrl(): [string, string] {
+
+    protected createState(): string {
         const array = new Uint8Array(32)
         crypto.getRandomValues(array)
         const state = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
-        chrome.storage.local.set({
-            oauth_state: state
-        })
+        return state;
+    }
 
+    public createUrl(): string {
+        const state = this.createState();
+        this.saveState(state);
         // Redirect to Google OAuth
         const authUrl = this.googleApi.getAuthUrl(state)
-        return [state, authUrl]
+        return authUrl
     }
 
     public isActivated(): boolean {
