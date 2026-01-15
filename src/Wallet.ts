@@ -26,19 +26,8 @@ export class Wallet extends AbstractWallet {
         this.session = new Session()
     }
 
-    public createStateAndUrl(): [string, string] {
-        const array = new Uint8Array(32)
-        crypto.getRandomValues(array)
-        const state = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
-        this.session.saveState(state)
-
-        // Redirect to Google OAuth
-        const authUrl = this.googleApi.getAuthUrl(state)
-        return [state, authUrl]
-    }
-
     public login(): void {
-        window.location.href = this.createUrl()[1]
+        window.location.href = this.createUrl()
     }
 
     protected getWallet(addr: string): Promise<WalletInitialiser | null> {
