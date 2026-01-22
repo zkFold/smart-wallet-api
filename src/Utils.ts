@@ -39,6 +39,16 @@ export function bytesToBase64Url(bytes: Uint8Array): string {
     return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 
+export function base64UrlDecode(str: string): string {
+  const base64Encoded = str.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = str.length % 4 === 0 ? '' : '='.repeat(4 - (str.length % 4));
+  const base64WithPadding = base64Encoded + padding;
+  return atob(base64WithPadding)
+    .split('')
+    .map(char => String.fromCharCode(char.charCodeAt(0)))
+    .join('');
+}
+
 export function harden(num: number): number {
     return 0x80000000 + num
 }

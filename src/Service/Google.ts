@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { GoogleTokenResponse, GoogleCertKey } from '../Types'
+import { base64UrlDecode } from '../Utils'
 
 export class GoogleApi {
     private clientId: string
@@ -129,5 +130,15 @@ export class GoogleApi {
     public stripSignature(jwt: string): string {
         const parts = jwt.split(".")
         return `${parts[0]}.${parts[1]}`
+    }
+
+    /**
+     * Base64url-decode the jwt 
+     * @param {string} jwt - The JWT string.
+     * @returns {string} The decoded JWT without the signature.
+     */
+    public decodeJwt(jwt: string): string {
+        const parts = jwt.split(".")
+        return `${base64UrlDecode(parts[0])}.${base64UrlDecode(parts[1])}`
     }
 }

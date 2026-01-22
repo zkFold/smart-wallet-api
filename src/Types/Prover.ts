@@ -94,6 +94,6 @@ export interface SigmaProofInput {
  *  @property {BigIntWrap[]}      aut         - Authentication elements
  */
 export interface SigmaProof {
-    v:   BigIntWrap[]
-    aut: BigIntWrap[]
+    v:    BigIntWrap[]
+    auts: BigIntWrap[]
 }

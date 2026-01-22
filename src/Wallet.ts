@@ -207,7 +207,7 @@ export class Wallet extends EventTarget  {
     private digest(data: bigint[], mod: bigint): bigint {
         let s = ''
         for (let i = 0; i < data.length; i++) {
-            s += data[i]
+            s += data[i].toString()
         }
 
         const md = forge.md.sha256.create();
@@ -235,10 +235,10 @@ export class Wallet extends EventTarget  {
             // sets SHcpt = a, computes aut = a^e mod N ,
             // outputs (SHcpt, aut);
             const bytes = Uint8Array.from(forge.random.getBytesSync(256).split("").map(x => x.charCodeAt(0))) // 256 bytes = 2048 bits, size of the keys
-            const a = b64ToBn(bytesToBase64Url(bytes)).toBigInt() % n 
+            const a = b64ToBn(btoa(String.fromCharCode(...bytes))).toBigInt() % n 
             const aut = expMod(a, e, n)
 
-            const i = this.digest([c.toString(), aut.toString()], e) // Fiat-Shamir transform -- use digest instead of a random element
+            const i = this.digest([c, aut], e) // Fiat-Shamir transform -- use digest instead of a random element
 
             //Distribute(s, SHcpt, i): parses SHcpt = a,
             //computes si = a · s^i mod N ,
@@ -252,7 +252,7 @@ export class Wallet extends EventTarget  {
 
         return {
             v: v,
-            aut: auts,
+            auts: auts,
         } as SigmaProof
     }
 
@@ -556,8 +556,9 @@ export class Wallet extends EventTarget  {
         let txHex
         const outs: Output[] = [{ address: recipientAddress.to_bech32(), value: rec.assets }]
 
-        if (this.activated) {
-            const resp = await this.backend!.sendFunds(this.userId, outs, this.tokenSKey.to_public().to_raw_key().hash().to_hex())
+        if (this.activated || this.apiVersion == 1) {
+            //const resp = await this.backend!.sendFunds(this.userId, outs, this.tokenSKey.to_public().to_raw_key().hash().to_hex())
+            const resp = await this.backend!.sendFundsv1(this.googleApi!.decodeJwt(this.jwt), outs, this.proof as SigmaProof)
             txHex = resp.transaction
         } else {
             const pubkeyHex = this.tokenSKey.to_public().to_raw_key().hash().to_hex()

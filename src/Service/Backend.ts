@@ -1,7 +1,7 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import axios from 'axios';
 import { serialize } from '../JSON';
-import { BigIntWrap, ProofBytes, Output, Reference, UTxO, CreateWalletResponse, SendFundsResponse, PrepareTxParameters, PrepareTxResponse, SubmitTxResult, ClientCredentials, Settings, BalanceResponse, Transaction } from '../Types'
+import { BigIntWrap, ProofBytes, SigmaProof, Output, Reference, UTxO, CreateWalletResponse, SendFundsResponse, PrepareTxParameters, PrepareTxResponse, SubmitTxResult, ClientCredentials, Settings, BalanceResponse, Transaction } from '../Types'
 
 /**
  * A wrapper for interaction with the backend.
@@ -46,7 +46,7 @@ export class Backend {
      * @returns {Settings}
      */
     public async settings(): Promise<Settings> {
-        const { data } = await axios.get(`${this.url}/${this.apiVersion}/settings`, this.headers())
+        const { data } = await axios.get(`${this.url}/v${this.apiVersion}/settings`, this.headers())
         return data
     }
 
@@ -56,7 +56,7 @@ export class Backend {
      * @returns {ClientCredentials}
      */
     public async credentials(): Promise<ClientCredentials> {
-        const { data } = await axios.get(`${this.url}/${this.apiVersion}/oauth/credentials`, this.headers())
+        const { data } = await axios.get(`${this.url}/v${this.apiVersion}/oauth/credentials`, this.headers())
         return data
     }
 
@@ -67,7 +67,7 @@ export class Backend {
      * @returns {CSL.Address}
      */
     public async walletMainAddress(email: string): Promise<CSL.Address> {
-        const { data } = await axios.post(`${this.url}/${this.apiVersion}/wallet/address`, {
+        const { data } = await axios.post(`${this.url}/v${this.apiVersion}/wallet/address`, {
             'email': email
         }, this.headers())
 
@@ -81,7 +81,7 @@ export class Backend {
      * @returns {CSL.Address}
      */
     public async walletUnusedAddress(email: string): Promise<CSL.Address> {
-        const { data } = await axios.post(`${this.url}/${this.apiVersion}/wallet/extra-address`, {
+        const { data } = await axios.post(`${this.url}/v${this.apiVersion}/wallet/extra-address`, {
             'email': email
         }, this.headers())
 
@@ -106,7 +106,7 @@ export class Backend {
 
         const payload = serialize(requestData)
 
-        const { data } = await axios.post(`${this.url}/${this.apiVersion}/wallet/activate`, payload,
+        const { data } = await axios.post(`${this.url}/v${this.apiVersion}/wallet/activate`, payload,
             this.headers({ 'Content-Type': 'application/json' })
         )
 
@@ -140,7 +140,7 @@ export class Backend {
 
         const payload = serialize(requestData)
 
-        const { data } = await axios.post(`${this.url}/${this.apiVersion}/wallet/activate-and-send-funds`, payload,
+        const { data } = await axios.post(`${this.url}/v${this.apiVersion}/wallet/activate-and-send-funds`, payload,
             this.headers({ 'Content-Type': 'application/json' })
         )
 
@@ -172,7 +172,29 @@ export class Backend {
 
         const payload = serialize(requestData)
 
-        const { data } = await axios.post(`${this.url}/${this.apiVersion}/wallet/send-funds`, payload,
+        const { data } = await axios.post(`${this.url}/v${this.apiVersion}/wallet/send-funds`, payload,
+            this.headers({ 'Content-Type': 'application/json' })
+        )
+
+        const response: SendFundsResponse = {
+            transaction: data.transaction,
+            transaction_fee: data.transaction_fee,
+            transaction_id: data.transaction_id
+        }
+
+        return response
+    }
+
+    public async sendFundsv1(jwt: string, outs: Output[], proof: SigmaProof): Promise<SendFundsResponse> {
+        const requestData = {
+            'jwt': jwt,
+            'outs': outs,
+            'proof': proof,
+        }
+
+        const payload = serialize(requestData)
+
+        const { data } = await axios.post(`${this.url}/v${this.apiVersion}/wallet/send-funds`, payload,
             this.headers({ 'Content-Type': 'application/json' })
         )
 
@@ -194,7 +216,7 @@ export class Backend {
     async prepareTx(params: PrepareTxParameters): Promise<PrepareTxResponse> {
         const payload = serialize(params)
 
-        const { data } = await axios.post(`${this.url}/${this.apiVersion}/wallet/prepare-tx`, payload,
+        const { data } = await axios.post(`${this.url}/v${this.apiVersion}/wallet/prepare-tx`, payload,
             this.headers({ 'Content-Type': 'application/json' })
         )
 
@@ -215,7 +237,7 @@ export class Backend {
      * @returns {SubmitTxResult} - Transaction ID and email delivery errors, if any
      */
     public async submitTx(transaction: string, email_recipients: string[] = [], sender?: string): Promise<SubmitTxResult> {
-        const { data } = await axios.post(`${this.url}/${this.apiVersion}/tx/submit`, {
+        const { data } = await axios.post(`${this.url}/v${this.apiVersion}/tx/submit`, {
             email_recipients: email_recipients,
             sender: sender,
             transaction: transaction
@@ -236,7 +258,7 @@ export class Backend {
      * @returns {SubmitTxResult} - Transaction ID and email delivery errors, if any
      */
     public async addVkeyAndSubmitTx(unsigned_transaction: string, vkey_witness: string, email_recipients: string[] = [], sender?: string): Promise<SubmitTxResult> {
-        const { data } = await axios.post(`${this.url}/${this.apiVersion}/tx/add-vkey-and-submit`, {
+        const { data } = await axios.post(`${this.url}/v${this.apiVersion}/tx/add-vkey-and-submit`, {
             unsigned_transaction: unsigned_transaction,
             vkey_witness: vkey_witness,
             email_recipients: email_recipients,
@@ -256,7 +278,7 @@ export class Backend {
      * @returns {UTxO[]}
      */
     public async addressUtxo(address: CSL.Address): Promise<UTxO[]> {
-        const { data } = await axios.post(`${this.url}/${this.apiVersion}/address/utxos`, [address.to_bech32()], this.headers())
+        const { data } = await axios.post(`${this.url}/v${this.apiVersion}/address/utxos`, [address.to_bech32()], this.headers())
 
         const result: UTxO[] = []
 
@@ -292,7 +314,7 @@ export class Backend {
      * @returns {BalanceResponse}
      */
     public async balance(email: string): Promise<BalanceResponse> {
-        const { data } = await axios.post(`${this.url}/${this.apiVersion}/address/balance`, email, this.headers({ 'Content-Type': 'application/json' }))
+        const { data } = await axios.post(`${this.url}/v${this.apiVersion}/address/balance`, email, this.headers({ 'Content-Type': 'application/json' }))
         return data
     }
 
@@ -303,7 +325,7 @@ export class Backend {
      * @returns {Transaction[]}
      */
     public async txHistory(email: string): Promise<Transaction[]> {
-        const { data } = await axios.post(`${this.url}/${this.apiVersion}/wallet/txs`, { 'email': email }, this.headers())
+        const { data } = await axios.post(`${this.url}/v${this.apiVersion}/wallet/txs`, { 'email': email }, this.headers())
 
         // TODO: fetch token tickers from Cardano Token Registry if it isn't done on the back end
         // 
