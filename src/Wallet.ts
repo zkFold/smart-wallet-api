@@ -238,7 +238,7 @@ export class Wallet extends EventTarget  {
             const a = b64ToBn(bytesToBase64Url(bytes)).toBigInt() % n 
             const aut = expMod(a, e, n)
 
-            const i = this.digest([c, aut], e) // Fiat-Shamir transform -- use digest instead of a random element
+            const i = this.digest([c.toString(), aut.toString()], e) // Fiat-Shamir transform -- use digest instead of a random element
 
             //Distribute(s, SHcpt, i): parses SHcpt = a,
             //computes si = a · s^i mod N ,
