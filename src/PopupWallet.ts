@@ -4,7 +4,7 @@ import { WalletInitialiser } from './Types'
 import { Prover } from './Service/Prover'
 import { harden } from './Utils'
 import { GoogleApi } from './Service/Google'
-import { AbstractWallet } from './AbstractWallet'
+import { AbstractWallet, WalletData } from './AbstractWallet'
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english'
 
@@ -64,7 +64,8 @@ export class PopupWallet extends AbstractWallet {
         this.activated = false
         this.proof = null
 
-        chrome.storage.local.clear();
+        // chrome.storage.local.clear();
+        chrome.storage.local.remove(['jwt', 'tokenSKey', 'userId', 'baseAddress']);
 
         // Dispatch logout event
         this.dispatchEvent(new CustomEvent('logged_out'))
@@ -88,6 +89,17 @@ export class PopupWallet extends AbstractWallet {
         // Set user ID
         this.userId = this.googleApi.getUserId(jwt)
 
+        chrome.storage.local.get(['googleAddresses'], async (res) => {
+            console.log("Saving data!")
+            const googleAddresses = res.googleAddresses as { [userId: string]: {jwt?: string, tokenSKey?: string, userId?: string} };
+            googleAddresses[this.userId as string] = {jwt: this.jwt, tokenSKey: this.tokenSKey?.to_hex(), userId: this.userId}
+            chrome.storage.local.set({
+                googleAddresses: googleAddresses
+            }, () => {
+                console.log('Save google address to storage');
+            });
+        });
+
         // Get Cardano address
         const address = await this.addressForGmail(this.userId).then((x: any) => x.to_bech32())
 
@@ -102,7 +114,8 @@ export class PopupWallet extends AbstractWallet {
         else {
             console.log("No existing wallet found, creating new wallet.")
             this.jwt = jwt
-            const mnemonic = bip39.generateMnemonic(wordlist);
+            const mnemonic = bip39.generateMnemonic(wordlist, 256);
+
             const entropy = bip39.mnemonicToEntropy(mnemonic, wordlist);
             const rootKey = CSL.Bip32PrivateKey.from_bip39_entropy(
                 entropy,

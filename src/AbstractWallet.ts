@@ -22,6 +22,8 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
     public jwt?: string
     public tokenSKey?: CSL.Bip32PrivateKey
     public userId?: string
+    public baseAddress?: CSL.Address
+
     public activated: boolean = false
     public proof: ProofBytes | null = null
 
@@ -103,6 +105,9 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
 
     public getUserId(): string {
         if (!this.userId) {
+            if (this.baseAddress) {
+                return "No user ID for base address wallets"
+            }
             throw new Error('Wallet is not initialised')
         }
         return this.userId
@@ -123,6 +128,9 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
      */
     public async getAddress(): Promise<CSL.Address> {
         if (!this.userId) {
+            if (this.baseAddress) {
+                return this.baseAddress
+            }
             throw new Error('Wallet is not initialised')
         }
         return await this.addressForGmail(this.userId)
@@ -134,6 +142,9 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
      */
     public async getUnusedAddress(): Promise<CSL.Address> {
         if (!this.userId) {
+            if (this.baseAddress) {
+                return this.baseAddress
+            }
             throw new Error('Wallet is not initialised')
         }
         return await this.backend.walletUnusedAddress(this.userId)
@@ -145,6 +156,9 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
      */
     public async getBalance(): Promise<BalanceResponse> {
         if (!this.userId) {
+            if (this.baseAddress) {
+                return { lovelace: 0, usd: 0, tokens: [] }
+            }
             throw new Error('Wallet is not initialised')
         }
         const balance = await this.backend.balance(this.userId)
@@ -166,6 +180,9 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
      */
     public async getTxHistory(): Promise<Transaction[]> {
         if (!this.userId) {
+            if (this.baseAddress) {
+                return []
+            }
             throw new Error('Wallet is not initialised')
         }
         return await this.backend.txHistory(this.userId)
