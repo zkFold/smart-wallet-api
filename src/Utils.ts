@@ -21,9 +21,17 @@ export function bytesToHex(bytes: Uint8Array): string {
 /**
  * Convert BigInt to byte array
  */
-export function bigIntToBytes(bigInt: bigint): Uint8Array {
+export function bigIntToBytes(bigInt: bigint, numBytes: number | undefined = undefined): Uint8Array {
     const hex = bigInt.toString(16)
-    const paddedHex = hex.length % 2 ? '0' + hex : hex
+    let paddedHex = hex.length % 2 ? '0' + hex : hex
+    if (numBytes) {
+       const currentBytes = paddedHex.length / 2
+       if (numBytes > currentBytes) {
+            for (let i = 0; i < (numBytes - currentBytes) / 2; ++i) {
+                paddedHex = '00' + paddedHex
+            }
+       }
+    }
     const bytes = new Uint8Array(paddedHex.length / 2)
     for (let i = 0; i < paddedHex.length; i += 2) {
         bytes[i / 2] = parseInt(paddedHex.substr(i, 2), 16)

@@ -3,7 +3,7 @@ import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
 import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, PlonkProofInput, SigmaProofInput, SigmaProof, SmartTxRecipient, BalanceResponse, Transaction, PrepareTxParameters, PrepareTxResponse } from './Types'
 import { Prover } from './Service/Prover'
-import { bytesToBase64Url, b64ToBn, harden, hexToBytes, expMod } from './Utils'
+import { bytesToBase64Url, bigIntToBytes, b64ToBn, harden, hexToBytes, expMod } from './Utils'
 import { Storage } from './Service/Storage'
 import { Session } from './Service/Session'
 import { GoogleApi } from './Service/Google'
@@ -205,23 +205,43 @@ export class Wallet extends EventTarget  {
     }
 
     private digest(data: bigint[], mod: bigint): bigint {
-        let s = ''
-        for (let i = 0; i < data.length; i++) {
-            s += data[i].toString()
-        }
+        const arrays = data.map((x) => bigIntToBytes(x, 256))
+
+        arrays.forEach((item) => console.log(item))
+        
+        // Get the total length of all arrays.
+        const length = 256 * data.length
+
+        // Create a new array with total length and merge all source arrays.
+        let mergedArray = new Uint8Array(length);
+
+        let offset = 0;
+        
+        arrays.forEach(item => {
+          mergedArray.set(item, offset);
+          offset += item.length;
+        });
+
+        console.log(mergedArray)
+        const bs = forge.util.createBuffer(mergedArray).getBytes() 
+        console.log(bs.length)
 
         const md = forge.md.sha256.create();
-        md.update(s); 
-        return BigInt('0x' + md.digest().toHex()) % mod 
+        md.update(bs); 
+        const result = md.digest().toHex()
+        console.log(result)
+        return BigInt('0x' + result) % mod 
     }
 
     private sigmaProve(input: SigmaProofInput): SigmaProof {
-        const iterations = 16
+        const iterations = 2 
 
         const n = input.piPubN.toBigInt()
         const s = input.piSignature.toBigInt()
         const e = input.piPubE.toBigInt()
         const c = expMod(s, e, n)
+
+        console.log(c)
         
 
         const auts = []
@@ -239,6 +259,7 @@ export class Wallet extends EventTarget  {
             const aut = expMod(a, e, n)
 
             const i = this.digest([c, aut], e) // Fiat-Shamir transform -- use digest instead of a random element
+            console.log(`I == ${i}`)
 
             //Distribute(s, SHcpt, i): parses SHcpt = a,
             //computes si = a · s^i mod N ,
