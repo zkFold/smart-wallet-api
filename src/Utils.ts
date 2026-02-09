@@ -1,4 +1,9 @@
 import { BigIntWrap } from "./Types";
+import * as CSL from '@emurgo/cardano-serialization-lib-browser'
+
+export function bip32PrivateKeyFromHex(hex: string): CSL.Bip32PrivateKey {
+    return CSL.Bip32PrivateKey.from_hex(hex) 
+}
 
 /**
  * Convert a hex string to a byte array

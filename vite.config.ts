@@ -19,11 +19,11 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [
-        '@emurgo/cardano-serialization-lib-asmjs'
+        '@emurgo/cardano-serialization-lib-browser'
       ],
       output: {
         globals: {
-          '@emurgo/cardano-serialization-lib-asmjs': 'CardanoWasm'
+          '@emurgo/cardano-serialization-lib-browser': 'CardanoWasm'
         }
       }
     },

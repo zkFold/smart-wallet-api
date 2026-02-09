@@ -1,4 +1,4 @@
-import * as CSL from '@emurgo/cardano-serialization-lib-asmjs'
+import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
 import { WalletInitialiser } from './Types'
 import { Prover } from './Service/Prover'
@@ -120,7 +120,7 @@ export class Wallet extends AbstractWallet {
         this.dispatchEvent(new CustomEvent('initialized'))
     }
 
-    protected oauthCallback(callbackData: string): Promise<void> {
+    public oauthCallback(callbackData: string): Promise<void> {
         return this.oauthCallbackAsync(callbackData);
     }
 

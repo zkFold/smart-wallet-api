@@ -142,6 +142,6 @@ The `JSON` module exposes `serialize`/`deserialize` for lossless (de)serialisati
 
 ## Notes
 
-- For asmjs builds, ensure `@emurgo/cardano-serialization-lib-asmjs` is available.
+- For asmjs builds, ensure `@emurgo/cardano-serialization-lib-browser` is available.
 - Proof generation relies on HTTPS access to Google’s JWKS (`https://www.googleapis.com/oauth2/v3/certs`).
 - When precomputing proofs, run `wallet.getProof()` once per fresh JWT; reuse `toWalletInitialiser()` afterwards to skip regeneration.

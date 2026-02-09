@@ -1,4 +1,4 @@
-import * as CSL from '@emurgo/cardano-serialization-lib-asmjs'
+import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
 import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, BalanceResponse, Transaction, WalletInitialiser, PrepareTxParameters, PrepareTxResponse } from './Types'
 import { Prover } from './Service/Prover'
@@ -46,7 +46,7 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
     protected abstract saveWallet(addr: string, wallet: WalletInitialiser): void;
     protected abstract saveState(state: string): void;
     protected abstract getWallet(addr: string): Promise<WalletInitialiser | null>;
-    protected abstract oauthCallback(callbackData: string): Promise<void>;
+    public abstract oauthCallback(callbackData: string): Promise<void>;
 
 
     protected createState(): string {
@@ -418,7 +418,8 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
             txHex = resp.transaction
 
         }
-        const transaction = CSL.FixedTransaction.from_bytes(hexToBytes(txHex))
+        const txBytes = hexToBytes(txHex)
+        const transaction = CSL.FixedTransaction.from_bytes(txBytes)
         transaction.sign_and_add_vkey_signature(this.tokenSKey.to_raw_key())
         const signedTxHex = Array.from(new Uint8Array(transaction.to_bytes())).map(b => b.toString(16).padStart(2, '0')).join('')
 

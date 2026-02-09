@@ -1,4 +1,4 @@
-import * as CSL from '@emurgo/cardano-serialization-lib-asmjs';
+import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 
 /**
  * Smart Wallet Backend settings
