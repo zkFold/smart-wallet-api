@@ -1,28 +1,28 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, BalanceResponse, Transaction, WalletInitialiser, PrepareTxParameters, PrepareTxResponse } from './Types'
+import { CIP30Wallet } from './CIP30Wallet'
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, BalanceResponse, Transaction, SmartContractWalletInitialiser, PrepareTxParameters, PrepareTxResponse } from './Types'
 import { Prover } from './Service/Prover'
 import { b64ToBn, harden, hexToBytes } from './Utils'
 import { GoogleApi } from './Service/Google'
 
-export interface WalletData {
+export interface SmartContractWalletData {
     jwt?: string
     tokenSKey?: CSL.Bip32PrivateKey
     userId?: string
     activated: boolean
     proof: ProofBytes | null
 }
-export interface WalletI {
+export interface SmartContractWalletI {
     googleApi: GoogleApi
     backend: Backend
     prover: Prover
 }
 
-export abstract class AbstractWallet extends EventTarget implements WalletI, WalletData {
+export abstract class AbstractGoogleWallet extends EventTarget implements CIP30Wallet, SmartContractWalletI, SmartContractWalletData {
     public jwt?: string
     public tokenSKey?: CSL.Bip32PrivateKey
     public userId?: string
-    public baseAddress?: CSL.Address
 
     public activated: boolean = false
     public proof: ProofBytes | null = null
@@ -45,9 +45,9 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
 
     public abstract login(): void;
     public abstract logout(): void;
-    protected abstract saveWallet(addr: string, wallet: WalletInitialiser): void;
+    protected abstract saveWallet(addr: string, wallet: SmartContractWalletInitialiser): void;
     protected abstract saveState(state: string): void;
-    protected abstract getWallet(addr: string): Promise<WalletInitialiser | null>;
+    protected abstract getWallet(addr: string): Promise<SmartContractWalletInitialiser | null>;
     public abstract oauthCallback(callbackData: string): Promise<void>;
 
 
@@ -105,9 +105,6 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
 
     public getUserId(): string {
         if (!this.userId) {
-            if (this.baseAddress) {
-                return "No user ID for base address wallets"
-            }
             throw new Error('Wallet is not initialised')
         }
         return this.userId
@@ -128,9 +125,6 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
      */
     public async getAddress(): Promise<CSL.Address> {
         if (!this.userId) {
-            if (this.baseAddress) {
-                return this.baseAddress
-            }
             throw new Error('Wallet is not initialised')
         }
         return await this.addressForGmail(this.userId)
@@ -142,9 +136,6 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
      */
     public async getUnusedAddress(): Promise<CSL.Address> {
         if (!this.userId) {
-            if (this.baseAddress) {
-                return this.baseAddress
-            }
             throw new Error('Wallet is not initialised')
         }
         return await this.backend.walletUnusedAddress(this.userId)
@@ -156,9 +147,6 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
      */
     public async getBalance(): Promise<BalanceResponse> {
         if (!this.userId) {
-            if (this.baseAddress) {
-                return { lovelace: 0, usd: 0, tokens: [] }
-            }
             throw new Error('Wallet is not initialised')
         }
         const balance = await this.backend.balance(this.userId)
@@ -180,9 +168,6 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
      */
     public async getTxHistory(): Promise<Transaction[]> {
         if (!this.userId) {
-            if (this.baseAddress) {
-                return []
-            }
             throw new Error('Wallet is not initialised')
         }
         return await this.backend.txHistory(this.userId)
