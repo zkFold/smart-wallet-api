@@ -1,17 +1,17 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
-import { WalletInitialiser } from './Types'
+import { SmartContractWalletInitialiser } from './Types'
 import { Prover } from './Service/Prover'
 import { harden } from './Utils'
 import { GoogleApi } from './Service/Google'
-import { AbstractWallet, WalletData } from './AbstractWallet'
+import { AbstractGoogleWallet, SmartContractWalletData } from './AbstractGoogleWallet'
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english'
 
 /**
  * The Wallet which can be initialised with an email address.
  */
-export class PopupWallet extends AbstractWallet {
+export class PopupGoogleWallet extends AbstractGoogleWallet {
 
     /**
      *  @param {Backend} backend                 - A Backend object for interaction with the backend
@@ -30,9 +30,9 @@ export class PopupWallet extends AbstractWallet {
         });
     }
 
-    protected getWallet(addr: string): Promise<WalletInitialiser | null> {
+    protected getWallet(addr: string): Promise<SmartContractWalletInitialiser | null> {
         return chrome.storage.local.get(['walletStorage']).then((res) => {
-            const wallets = res?.walletStorage as { [addr: string]: WalletInitialiser } | undefined;
+            const wallets = res?.walletStorage as { [addr: string]: SmartContractWalletInitialiser } | undefined;
             console.log("Retrieved wallets from storage:", wallets);
             return wallets?.[addr] ?? null;
         });
@@ -44,10 +44,10 @@ export class PopupWallet extends AbstractWallet {
         })
     }
 
-    protected saveWallet(addr: string, wallet: WalletInitialiser): void {
+    protected saveWallet(addr: string, wallet: SmartContractWalletInitialiser): void {
         chrome.storage.local.get(['walletStorage'], (res) => {
             const version = res.version;
-            let wallets = res.wallets as { [addr: string]: WalletInitialiser };
+            let wallets = res.wallets as { [addr: string]: SmartContractWalletInitialiser };
             wallets[addr] = wallet;
             chrome.storage.local.set({
                 version: version,
@@ -104,11 +104,11 @@ export class PopupWallet extends AbstractWallet {
         const address = await this.addressForGmail(this.userId).then((x: any) => x.to_bech32())
 
         // Check if there is an existing wallet for the same Cardano address
-        const exitingWalletInit = await this.getWallet(address)
-        if (exitingWalletInit) {
+        const exitingSmartContractWalletInit = await this.getWallet(address)
+        if (exitingSmartContractWalletInit) {
             // TODO: check if we have a UTxO with the token matching the existing wallet's tokenSKey
-            this.jwt = exitingWalletInit.jwt
-            this.tokenSKey = CSL.Bip32PrivateKey.from_hex(exitingWalletInit.tokenSKey as string)
+            this.jwt = exitingSmartContractWalletInit.jwt
+            this.tokenSKey = CSL.Bip32PrivateKey.from_hex(exitingSmartContractWalletInit.tokenSKey as string)
             this.activated = true
         }
         else {
