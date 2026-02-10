@@ -1,17 +1,17 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
-import { WalletInitialiser } from './Types'
+import { SmartContractWalletInitialiser } from './Types'
 import { Prover } from './Service/Prover'
 import { harden } from './Utils'
 import { Storage } from './Service/Storage'
 import { Session } from './Service/Session'
 import { GoogleApi } from './Service/Google'
-import { AbstractWallet } from './AbstractWallet'
+import { AbstractGoogleWallet } from './AbstractGoogleWallet'
 
 /**
  * The Wallet which can be initialised with an email address.
  */
-export class Wallet extends AbstractWallet {
+export class Wallet extends AbstractGoogleWallet {
     public storage: Storage
     public session: Session
 
@@ -30,11 +30,11 @@ export class Wallet extends AbstractWallet {
         window.location.href = this.createUrl()
     }
 
-    protected getWallet(addr: string): Promise<WalletInitialiser | null> {
+    protected getWallet(addr: string): Promise<SmartContractWalletInitialiser | null> {
         return Promise.resolve(this.storage.getWallet(addr));
     }
 
-    protected saveWallet(addr: string, wallet: WalletInitialiser): void {
+    protected saveWallet(addr: string, wallet: SmartContractWalletInitialiser): void {
         this.storage.saveWallet(addr, wallet);
     }
 
@@ -94,12 +94,12 @@ export class Wallet extends AbstractWallet {
         const address = await this.addressForGmail(this.userId).then((x: any) => x.to_bech32())
 
         // Check if there is an existing wallet for the same Cardano address
-        const exitingWalletInit = this.storage.getWallet(address)
-        if (exitingWalletInit) {
+        const exitingSmartContractWalletInit = this.storage.getWallet(address)
+        if (exitingSmartContractWalletInit) {
             // TODO: check if we have a UTxO with the token matching the existing wallet's tokenSKey
 
-            this.jwt = exitingWalletInit.jwt
-            this.tokenSKey = CSL.Bip32PrivateKey.from_hex(exitingWalletInit.tokenSKey as string)
+            this.jwt = exitingSmartContractWalletInit.jwt
+            this.tokenSKey = CSL.Bip32PrivateKey.from_hex(exitingSmartContractWalletInit.tokenSKey as string)
             this.activated = true
         }
         else {
