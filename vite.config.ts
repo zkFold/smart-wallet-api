@@ -19,7 +19,6 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [
-        // Keep these as external for browser compatibility
         '@emurgo/cardano-serialization-lib-browser'
       ],
       output: {
@@ -30,12 +29,6 @@ export default defineConfig({
     },
     target: 'es2020',
     minify: 'terser'
-  },
-  resolve: {
-    alias: {
-      // Use browser-compatible CSL
-      '@emurgo/cardano-serialization-lib-asmjs/cardano_serialization_lib': '@emurgo/cardano-serialization-lib-browser'
-    }
   },
   define: {
     global: 'globalThis'
