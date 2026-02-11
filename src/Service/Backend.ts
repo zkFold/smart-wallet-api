@@ -285,8 +285,13 @@ export class Backend {
      * @param {CSL.Address} address
      * @returns {BalanceResponse}
      */
-    public async balance(email: string): Promise<BalanceResponse> {
+    public async emailBalance(email: string): Promise<BalanceResponse> {
         const { data } = await axios.post(`${this.url}/v0/address/balance`, email, this.headers({ 'Content-Type': 'application/json' }))
+        return data
+    }
+
+    public async addressBalance(addresses: CSL.Address[]): Promise<BalanceResponse> {
+        const { data } = await axios.post(`${this.url}/v0/address/balance`, addresses.map((x) => x.to_bech32()), this.headers({ 'Content-Type': 'application/json' }))
         return data
     }
 
@@ -296,8 +301,20 @@ export class Backend {
      * @param {string} address
      * @returns {Transaction[]}
      */
-    public async txHistory(email: string): Promise<Transaction[]> {
+    public async emailTxHistory(email: string): Promise<Transaction[]> {
         const { data } = await axios.post(`${this.url}/v0/wallet/txs`, { 'email': email }, this.headers())
+
+        // TODO: fetch token tickers from Cardano Token Registry if it isn't done on the back end
+        // 
+        return data.map((tx: any) => {
+            tx.from_addrs = tx.from_addrs.map((addr: string) => CSL.Address.from_bech32(addr))
+            tx.to_addrs = tx.to_addrs.map((addr: string) => CSL.Address.from_bech32(addr))
+            return tx
+        })
+    }
+
+    public async addressTxHistory(addresses: CSL.Address[]): Promise<Transaction[]> {
+        const { data } = await axios.post(`${this.url}/v0/wallet/txs`, { 'addresses': addresses.map((x) => x.to_bech32()) }, this.headers())
 
         // TODO: fetch token tickers from Cardano Token Registry if it isn't done on the back end
         // 
