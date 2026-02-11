@@ -149,7 +149,7 @@ export abstract class AbstractGoogleWallet extends EventTarget implements CIP30W
         if (!this.userId) {
             throw new Error('Wallet is not initialised')
         }
-        const balance = await this.backend.balance(this.userId)
+        const balance = await this.backend.emailBalance(this.userId)
         return balance
     }
 
@@ -170,7 +170,7 @@ export abstract class AbstractGoogleWallet extends EventTarget implements CIP30W
         if (!this.userId) {
             throw new Error('Wallet is not initialised')
         }
-        return await this.backend.txHistory(this.userId)
+        return await this.backend.emailTxHistory(this.userId)
     }
 
     /**
@@ -255,11 +255,14 @@ export abstract class AbstractGoogleWallet extends EventTarget implements CIP30W
                 throw new Error('There is no active wallet when sending transaction')
             }
 
-            console.log(`Sending ${request.amount} ${request.asset} to ${request.recipient} using ${request.recipientType}`)
+            console.log(`Sending ${request.assets} to ${request.recipient} using ${request.recipientType}`)
 
             // Create asset dictionary
             const assetDict: { [key: string]: BigIntWrap } = {}
-            assetDict[request.asset] = new BigIntWrap(request.amount)
+
+            for (let [key, value] of Object.entries(request.assets)) {
+                assetDict[key] = new BigIntWrap(value)
+            }
 
             // Create recipient
             let recipient: SmartTxRecipient

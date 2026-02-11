@@ -48,7 +48,7 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
         
         const entropy = bip39.mnemonicToEntropy(seedphrase, wordlist);
         this.rootKey = CSL.Bip32PrivateKey.from_bip39_entropy(
-              Buffer.from(entropy, 'hex'),
+              Buffer.from(entropy),
               Buffer.from(password),
             );
         this.accountKey = this.rootKey
@@ -112,7 +112,7 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
      */
     async getBalance(): Promise<BalanceResponse> {
         const usedAddresses = this.getUsedAddressesSync() 
-        const balance = await this.backend.balance(usedAddresses)
+        const balance = await this.backend.addressBalance(usedAddresses)
         return balance
     }
 
@@ -131,7 +131,7 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
      */
     async getTxHistory(): Promise<Transaction[]> {
         const usedAddresses = this.getUsedAddressesSync() 
-        return await this.backend.txHistory(usedAddresses)
+        return await this.backend.addressTxHistory(usedAddresses)
     }
 
     /**
@@ -213,27 +213,15 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
      */
     async sendTransaction(request: TransactionRequest): Promise<void> {
         this.dispatchEvent(new CustomEvent('transaction_initiated', { detail: true }))
-        console.log(`Sending ${request.amount} ${request.asset} to ${request.recipient} using ${request.recipientType}`)
+        console.log(`Sending ${request.assets} to ${request.recipient} using ${request.recipientType}`)
 
-        // Create recipient
-        let recipient: SmartTxRecipient
-        switch (request.recipientType) {
-            case AddressType.Bech32:
-                recipient = { recipientType: AddressType.Bech32, address: request.recipient, assets: assetDict }
-                break
-            case AddressType.Email:
-                recipient = { recipientType: AddressType.Email, address: request.recipient, assets: assetDict }
-                break
-            default:
-                throw new Error(`Unsupported recipient type: ${request.recipientType}`)
-        }
-
+        const senderAddress = await this.getAddress()
         let recipientAddress
 
-        if (recipient.recipientType == AddressType.Email) {
-            recipientAddress = await this.addressForGmail(recipient.address)
+        if (request.recipientType == AddressType.Email) {
+            recipientAddress = await this.backend.walletMainAddress(request.recipient) 
         } else {
-            recipientAddress = CSL.Address.from_bech32(recipient.address)
+            recipientAddress = CSL.Address.from_bech32(request.recipient)
         }    
 
         const utxos = await this.getUtxos();
@@ -281,9 +269,34 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
 
         txBuilder.set_inputs(txInputBuilder);
 
+        const value = CSL.Value.new(CSL.BigNum.from_str(request.assets['lovelace'].toString())); 
+        const multiAsset = CSL.MultiAsset.new();
+        const assets = CSL.Assets.new();
+
+        for (let [key, value] of Object.entries(request.assets)) {
+            if (key === 'lovelace') {
+                continue;
+            }
+
+            const [policyHex, assetNameHex] = key.split(".");
+
+            assets.insert(
+              CSL.AssetName.new(Buffer.from(assetNameHex, "hex")),
+              CSL.BigNum.from_str(value.toString())
+            );
+
+            multiAsset.insert(
+              CSL.ScriptHash.from_bytes(Buffer.from(policyHex, "hex")),
+              assets
+            );
+        }
+
+        value.set_multiasset(multiAsset);
+
+
         const output = CSL.TransactionOutput.new(
-                recipientAddress,
-                CSL.Value.new(amountToSend),
+          recipientAddress, 
+          value
         );
 
         txBuilder.add_output(output);
