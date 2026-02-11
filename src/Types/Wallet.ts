@@ -42,8 +42,7 @@ export enum AddressType {
 export interface TransactionRequest {
     recipient: string
     recipientType: AddressType
-    asset: string
-    amount: string
+    assets: {[asset: string] : number}
 }
 
 /**
