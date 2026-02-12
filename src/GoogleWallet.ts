@@ -11,7 +11,7 @@ import { AbstractGoogleWallet } from './AbstractGoogleWallet'
 /**
  * The Wallet which can be initialised with an email address.
  */
-export class Wallet extends AbstractGoogleWallet {
+export class GoogleWallet extends AbstractGoogleWallet {
     public storage: Storage
     public session: Session
 
