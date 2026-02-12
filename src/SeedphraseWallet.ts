@@ -22,14 +22,31 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
      *  @param {Backend} backend         - A Backend object for communication with Cardano
      *  @param {string} seedphrase       - Seedphrase of the wallet 
      *  @param {string} password         - Optional password
-     *  @param {string} network          - Accepted values: 'mainnet', 'preprod', 'preview'
      */
-    constructor(backend: Backend, seedphrase: string, password: string = '', network: string = 'mainnet') {
+    constructor(backend: Backend, seedphrase: string, password: string = '') {
         super()
 
         this.backend = backend;
 
         this.storage = new Storage();
+
+        const entropy = bip39.mnemonicToEntropy(seedphrase, wordlist);
+        this.rootKey = CSL.Bip32PrivateKey.from_bip39_entropy(
+              Buffer.from(entropy),
+              Buffer.from(password),
+            );
+        this.accountKey = this.rootKey
+          .derive(harden(1852)) // purpose
+          .derive(harden(1815)) // coin type
+          .derive(harden(0)); // account #0
+
+        this.lastUsedAddress = 0;
+
+        this.dispatchEvent(new CustomEvent('initialized'))
+    }
+
+    public async setNetwork(): Promise<void> {
+        const { network } = await this.backend.settings()
 
         switch (network) {
             case "mainnet": {
@@ -46,17 +63,6 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
             };
         };
         
-        const entropy = bip39.mnemonicToEntropy(seedphrase, wordlist);
-        this.rootKey = CSL.Bip32PrivateKey.from_bip39_entropy(
-              Buffer.from(entropy),
-              Buffer.from(password),
-            );
-        this.accountKey = this.rootKey
-          .derive(harden(1852)) // purpose
-          .derive(harden(1815)) // coin type
-          .derive(harden(0)); // account #0
-
-        this.lastUsedAddress = 0;
     }
 
     private generateAddress(ix: number): CSL.Address {
@@ -95,6 +101,10 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
      */
     getAddress(): Promise<CSL.Address> {
         return new Promise((resolve, reject) => resolve(this.generateAddress(0)))
+    }
+
+    getUserId(): string {
+        return this.generateAddress(0).to_bech32()
     }
 
     /**
@@ -361,6 +371,11 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
             console.error('Failed to check transaction status:', error)
             return { outcome: "failure", reason: error }
         }
+    }
+
+    public logout(): void {
+        // Dispatch logout event
+        this.dispatchEvent(new CustomEvent('logged_out'))
     }
 }            
              
