@@ -1,7 +1,15 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { UTxO, TransactionRequest, BalanceResponse, Transaction, AddressType, SmartTxRecipient } from './Types'
+import { 
+    AddressType, 
+    BalanceResponse, 
+    BigIntWrap,
+    SmartTxRecipient, 
+    Transaction, 
+    TransactionRequest, 
+    UTxO, 
+} from './Types'
 import { CIP30Wallet } from './CIP30Wallet'
 import { Storage } from './Service/Storage'
 import { harden } from './Utils'
@@ -207,6 +215,35 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
         return new Promise((resolve, reject) => resolve([rewardAddr.to_address()]));
     }
 
+    private buildValue(assetDict: { [key: string]: (number | BigIntWrap) }): CSL.Value {
+        const adaValue = assetDict['lovelace'] == null ? "0" : assetDict['lovelace'].toString()
+
+        const value = CSL.Value.new(CSL.BigNum.from_str(adaValue)); 
+        const multiAsset = CSL.MultiAsset.new();
+        const assets = CSL.Assets.new();
+
+        for (let [key, value] of Object.entries(assetDict)) {
+            if (key === 'lovelace') {
+                continue;
+            }
+
+            const [policyHex, assetNameHex] = key.split(".");
+
+            assets.insert(
+              CSL.AssetName.new(Buffer.from(assetNameHex, "hex")),
+              CSL.BigNum.from_str(value.toString())
+            );
+
+            multiAsset.insert(
+              CSL.ScriptHash.from_bytes(Buffer.from(policyHex, "hex")),
+              assets
+            );
+        }
+
+        value.set_multiasset(multiAsset);
+        return value
+    }
+
     /**
      * @async
      * Get wallet's change address (currently wallet's main address) 
@@ -267,42 +304,18 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
         const txInputBuilder = CSL.TxInputsBuilder.new();
 
         utxos.forEach((utxo) => {
-            if (utxo.value['lovelace'] != null) {
-                const ada = utxo.value['lovelace'];
-                const hash = CSL.TransactionHash.from_bytes(Buffer.from(utxo.ref.transaction_id, "hex"))
-                const input = CSL.TransactionInput.new(hash, utxo.ref.output_index);
-                const value = CSL.Value.new(ada.toBigNum());
-                const addr = utxo.address;
-                txInputBuilder.add_regular_input(addr, input, value);
-            }
+            const hash = CSL.TransactionHash.from_bytes(Buffer.from(utxo.ref.transaction_id, "hex"))
+            const input = CSL.TransactionInput.new(hash, utxo.ref.output_index);
+
+            const value = this.buildValue(utxo.value) 
+            const addr = utxo.address;
+
+            txInputBuilder.add_regular_input(addr, input, value);
         });
 
         txBuilder.set_inputs(txInputBuilder);
 
-        const value = CSL.Value.new(CSL.BigNum.from_str(request.assets['lovelace'].toString())); 
-        const multiAsset = CSL.MultiAsset.new();
-        const assets = CSL.Assets.new();
-
-        for (let [key, value] of Object.entries(request.assets)) {
-            if (key === 'lovelace') {
-                continue;
-            }
-
-            const [policyHex, assetNameHex] = key.split(".");
-
-            assets.insert(
-              CSL.AssetName.new(Buffer.from(assetNameHex, "hex")),
-              CSL.BigNum.from_str(value.toString())
-            );
-
-            multiAsset.insert(
-              CSL.ScriptHash.from_bytes(Buffer.from(policyHex, "hex")),
-              assets
-            );
-        }
-
-        value.set_multiasset(multiAsset);
-
+        const value = this.buildValue(request.assets); 
 
         const output = CSL.TransactionOutput.new(
           recipientAddress, 
@@ -378,10 +391,3 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
         this.dispatchEvent(new CustomEvent('logged_out'))
     }
 }            
-             
-             
-             
-             
-             
-             
-             
