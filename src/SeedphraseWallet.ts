@@ -12,7 +12,7 @@ import {
 } from './Types'
 import { CIP30Wallet } from './CIP30Wallet'
 import { Storage } from './Service/Storage'
-import { harden } from './Utils'
+import { harden, hexToBytes } from './Utils'
 import { Backend } from './Service/Backend'
 
 export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
@@ -31,7 +31,7 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
      *  @param {string} seedphrase       - Seedphrase of the wallet 
      *  @param {string} password         - Optional password
      */
-    constructor(backend: Backend, seedphrase: string, password: string = '') {
+    constructor(backend: Backend, seedphrase: string, password: string = '', emitEvent: boolean = true) {
         super()
 
         this.backend = backend;
@@ -50,7 +50,9 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
 
         this.lastUsedAddress = 0;
 
-        this.dispatchEvent(new CustomEvent('initialized'))
+        if (emitEvent) {
+            this.dispatchEvent(new CustomEvent('initialized'))
+        }
     }
 
     public async setNetwork(): Promise<void> {
@@ -250,6 +252,16 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
      */
     async getChangeAddress(): Promise<CSL.Address> {
         return await this.getAddress()
+    }
+
+    /**
+     * Get a Vkey witness for a hex-encoded transaction
+     */
+    public signTransaction(txHex: string): CSL.TransactionWitnessSet {
+        const txBytes = hexToBytes(txHex)
+        const transaction = CSL.FixedTransaction.from_bytes(txBytes)
+        transaction.sign_and_add_vkey_signature(this.accountKey.derive(0).derive(0).to_raw_key());
+        return transaction.witness_set() 
     }
 
     /**

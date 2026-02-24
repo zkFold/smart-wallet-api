@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import { resolve } from 'path'
 import dts from 'vite-plugin-dts'
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import inject from '@rollup/plugin-inject'
 
 export default defineConfig({
   plugins: [
@@ -35,7 +36,8 @@ export default defineConfig({
         globals: {
           '@emurgo/cardano-serialization-lib-browser': 'CardanoWasm'
         }
-      }
+      }//,
+     // plugins: [inject({ Buffer: ['Buffer', 'Buffer'] })],
     },
     target: 'es2020',
     minify: 'terser'
