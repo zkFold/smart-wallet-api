@@ -1,15 +1,20 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { harden } from './Utils'
+import { harden, bytesToHex } from './Utils'
 import { Backend } from './Service/Backend'
 import { SeedphraseWallet } from './SeedphraseWallet'
 import * as L2 from './Service/L2'
+import { jubjub } from '@noble/curves/misc.js'
 
 export class L2Wallet extends EventTarget {
     private readonly backend: Backend;
     private readonly l2: L2.L2Backend;
     private readonly seedphraseWallet: SeedphraseWallet;
+
+    private readonly secretKey: Uint8Array;
+    private readonly publicKey: Uint8Array;
+
 
     /**
      *  @param {Backend} backend         - A Backend object for communication with Cardano
@@ -23,8 +28,21 @@ export class L2Wallet extends EventTarget {
         this.l2 = l2;
         this.seedphraseWallet = new SeedphraseWallet(backend, seedphrase, password, false)
 
-        const entropy = bip39.mnemonicToEntropy(seedphrase, wordlist);
+        const entropy: Uint8Array = bip39.mnemonicToEntropy(seedphrase, wordlist);
 
+        const scalar = BigInt('0x' + bytesToHex(entropy))
+        console.log(scalar)
+
+
+        const { secretKey, publicKey } = jubjub.keygen(entropy);
+        this.secretKey = secretKey
+        this.publicKey = publicKey
+
+        console.log(secretKey)
+        const msg = new TextEncoder().encode('hello noble');
+        const sig = jubjub.sign(msg, secretKey);
+
+        console.log(sig)
         //this.dispatchEvent(new CustomEvent('initialized'))
     }
 
