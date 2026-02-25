@@ -2,6 +2,7 @@ import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import axios from 'axios';
 import { serialize } from '../JSON';
 import { BigIntWrap } from '../Types'
+import { Buffer } from 'buffer';
 
 export class FieldElement {
     private readonly scalar: string

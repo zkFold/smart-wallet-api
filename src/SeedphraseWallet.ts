@@ -14,6 +14,7 @@ import { CIP30Wallet } from './CIP30Wallet'
 import { Storage } from './Service/Storage'
 import { harden, hexToBytes } from './Utils'
 import { Backend } from './Service/Backend'
+import { Buffer } from 'buffer';
 
 export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
     private storage: Storage
