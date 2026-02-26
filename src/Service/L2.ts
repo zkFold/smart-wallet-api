@@ -1,25 +1,30 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
 import axios from 'axios';
-import { serialize } from '../JSON';
-import { BigIntWrap } from '../Types'
+import { serialize, deserialize } from '../JSON';
 import { Buffer } from 'buffer';
+import JSONbig from "json-bigint";
+
+function stringifyWithBigInt(obj: unknown): string {
+  return JSON.stringify(obj).replace(/"__bigint__:(\d+)"/g, "$1");
+}
 
 export class FieldElement {
-    private readonly scalar: string
+    public readonly scalar: bigint 
 
     public constructor(scalar: string) {
-        this.scalar = scalar
+        this.scalar = BigInt(scalar)
     }
 
     public static readonly zero: FieldElement = new FieldElement("0")
 
     public toString(): string {
-        return this.scalar
+        return this.scalar.toString()
     }
 
     public toJSON() {
-        return this.toString()
+        return `__bigint__:${this.scalar}`
     }
+
 }
 
 export class L2Address {
@@ -37,7 +42,7 @@ export class L2Address {
     }
 
     public toJSON() {
-        return this.toString()
+        return this.fieldElement.toJSON()
     }
 }
 
@@ -56,7 +61,7 @@ export class L2OutputRef {
 
     public toJSON() {
         return {
-            orTxId: this.orTxId.toJSON(),
+            orTxId: this.orTxId,
             orIndex: this.orIndex,
         }
     }
@@ -65,25 +70,25 @@ export class L2OutputRef {
 export class AssetValue {
     private readonly assetPolicy: FieldElement
     private readonly assetName: FieldElement
-    private readonly assetQuantity: BigIntWrap
+    private readonly assetQuantity: number 
 
-    public constructor(assetPolicy: FieldElement, assetName: FieldElement, assetQuantity: BigIntWrap) {
+    public constructor(assetPolicy: FieldElement, assetName: FieldElement, assetQuantity: number) {
         this.assetPolicy = assetPolicy
         this.assetName = assetName
         this.assetQuantity = assetQuantity
     }
 
-    public static readonly empty: AssetValue = new AssetValue(FieldElement.zero, FieldElement.zero, BigIntWrap.zero)
+    public static readonly empty: AssetValue = new AssetValue(FieldElement.zero, FieldElement.zero, 0)
 
-    public static ada(quantity: BigIntWrap): AssetValue {
+    public static ada(quantity: number): AssetValue {
         return new AssetValue(FieldElement.zero, FieldElement.zero, quantity)
     }
 
     public toJSON() {
         return {
-            assetPolicy: this.assetPolicy.toJSON(),
-            assetName: this.assetName.toJSON(),
-            assetQuantity: this.assetQuantity.toJSON(),
+            assetPolicy: this.assetPolicy,
+            assetName: this.assetName,
+            assetQuantity: this.assetQuantity,
         }
     }
 
@@ -121,7 +126,7 @@ export class L2Output {
 
     public toJSON() {
         return {
-            oAddress: this.oAddress.toString(),
+            oAddress: this.oAddress,
             oAssets: this.fillAssets()
         }
     }
@@ -142,8 +147,8 @@ export class L2UTxO {
 
     public toJSON() {
         return {
-            uRef: this.uRef.toJSON(),
-            uOutput: this.uOutput.toJSON(),
+            uRef: this.uRef,
+            uOutput: this.uOutput,
         }
     }
 
@@ -170,11 +175,8 @@ export class L2TxOutput {
         return new L2TxOutput(output, true)
     }
 
-    public toJSON() { // TODO: probably won't work -- fix this
-        return {
-            output: this.output.toJSON(),
-            bridgeOut: this.bridgeOut
-        }
+    public toJSON() { 
+        return [this.output, this.bridgeOut]
     }
 }
 
@@ -352,9 +354,8 @@ export class L2Backend {
      * @returns {TxHashResponse}
      */
     public async txHash(tx: TxHashRequest): Promise<TxHashResponse> {
-        const { data } = await axios.post(`${this.url}/v0/tx/hash/`, tx, this.headers())
-
-        return data
+        const { data } = await axios.post(`${this.url}/v0/tx/hash/`, stringifyWithBigInt(tx), { ...this.headers({ "Content-Type": "application/json" }), ...{ responseType: 'text' } })
+        return deserialize(data)
     }
 
 
@@ -365,7 +366,7 @@ export class L2Backend {
      * @returns {SubmitTxResponse}
      */
     public async submitTx(txRequest: SubmitTxRequest): Promise<SubmitTxResponse> {
-        const { data } = await axios.post(`${this.url}/v0/tx/`, txRequest, this.headers())
+        const { data } = await axios.post(`${this.url}/v0/tx/`, stringifyWithBigInt(txRequest), this.headers({ "Content-Type": "application/json" }))
 
         return data
     }
@@ -377,14 +378,13 @@ export class L2Backend {
      * @returns {BridgeInResponse}
      */
     public async bridgeIn(bridgeInRequest: BridgeInRequest): Promise<BridgeInResponse> {
-        const dest: number = +bridgeInRequest.destination_address.toString()
         const req = {
             amount: bridgeInRequest.amount,
-            destination_address: dest,
+            destination_address: bridgeInRequest.destination_address,
             used_addresses: bridgeInRequest.used_addresses.map((x) => x.to_bech32()),
             change_address: bridgeInRequest.change_address.to_bech32(),
         }
-        const { data } = await axios.post(`${this.url}/v0/bridge/in/`, req, this.headers())
+        const { data } = await axios.post(`${this.url}/v0/bridge/in/`, stringifyWithBigInt(req), this.headers({ "Content-Type": "application/json" }))
 
         return data 
     }
