@@ -241,6 +241,24 @@ export class SubmitTxResponse {
 
 // ==============================================================
 
+export interface TxParametersResponse {
+    inputs: number,
+    outputs: number,
+    assets: number,
+}
+
+// ==============================================================
+
+export interface TxHashRequest {
+    transaction: L2Tx
+}
+
+export interface TxHashResponse {
+    hash: FieldElement
+}
+
+// ==============================================================
+
 export interface BridgeInRequest {
     amount: {[key: string]: number},
     destination_address: L2Address,
@@ -316,6 +334,29 @@ export class L2Backend {
         return data.qlurUtxos
     }
 
+    /**
+     * Obtain current transaction parameters (supported inputs, outputs and assets) 
+     * @async
+     * @returns {TxParametersResponse}
+     */
+    public async txParameters(): Promise<TxParametersResponse> {
+        const { data } = await axios.get(`${this.url}/v0/tx/parameters/`, this.headers())
+
+        return data
+    }
+
+    /**
+     * Obtain hash of an L2 transaction 
+     * @async
+     * @param {TxHashRequest} txRequest
+     * @returns {TxHashResponse}
+     */
+    public async txHash(tx: TxHashRequest): Promise<TxHashResponse> {
+        const { data } = await axios.post(`${this.url}/v0/tx/hash/`, tx, this.headers())
+
+        return data
+    }
+
 
     /**
      * Submit an L2 transaction
@@ -324,7 +365,7 @@ export class L2Backend {
      * @returns {SubmitTxResponse}
      */
     public async submitTx(txRequest: SubmitTxRequest): Promise<SubmitTxResponse> {
-        const { data } = await axios.post(`${this.url}/v0/tx/`, JSON.stringify(txRequest), this.headers())
+        const { data } = await axios.post(`${this.url}/v0/tx/`, txRequest, this.headers())
 
         return data
     }
@@ -339,9 +380,9 @@ export class L2Backend {
         const dest: number = +bridgeInRequest.destination_address.toString()
         const req = {
             amount: bridgeInRequest.amount,
-            destinationAddress: dest,
-            usedAddresses: bridgeInRequest.used_addresses.map((x) => x.to_bech32()),
-            changeAddress: bridgeInRequest.change_address.to_bech32(),
+            destination_address: dest,
+            used_addresses: bridgeInRequest.used_addresses.map((x) => x.to_bech32()),
+            change_address: bridgeInRequest.change_address.to_bech32(),
         }
         const { data } = await axios.post(`${this.url}/v0/bridge/in/`, req, this.headers())
 

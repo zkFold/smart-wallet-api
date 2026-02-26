@@ -44,10 +44,24 @@ export class L2Wallet extends EventTarget {
 
         console.log(sig)
         //this.dispatchEvent(new CustomEvent('initialized'))
+        
     }
 
     async setNetwork(): Promise<void> {
         await this.seedphraseWallet.setNetwork()
+    }
+
+    async txParameters(): Promise<void> {
+        const { inputs, outputs, assets } = await this.l2.txParameters()
+        
+        const l2Tx = new L2.L2Tx(inputs, outputs, assets)
+
+        console.log(l2Tx)
+
+        const hash = await this.l2.txHash({ transaction: l2Tx })
+
+        console.log(hash)
+
     }
 
     async bridgeIn(): Promise<void> {
@@ -80,6 +94,10 @@ export class L2Wallet extends EventTarget {
         await delay(300_000)
         const utxos = await this.l2.utxos(new L2.L2Address("42"))
         console.log(utxos)
+    }
+
+    async l2Tx(): Promise<void> {
+        
     }
 
 }            
