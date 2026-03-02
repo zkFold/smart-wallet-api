@@ -233,12 +233,44 @@ export class L2Tx {
     }
 }
 
-export class SubmitTxRequest {
+export class Signature {
+    private readonly curvePoint: number
+    private readonly scalar: number
+    private readonly pubkey: number
 
+    constructor() {
+        this.curvePoint = 0
+        this.scalar = 0
+        this.pubkey = 0
+    }
+
+    public toJSON() {
+        return [this.curvePoint, [this.scalar, this.pubkey]]
+    }
 }
 
-export class SubmitTxResponse {
+export class BridgeOut {
+    private readonly value: { [key: string]: number }
+    private readonly address: CSL.Address
 
+    constructor() {
+        this.value = {}
+        this.address = CSL.Address.from_bech32("addr_test1wrlu98daep56mrzjzefvsdu43q8pzjtfk3luvku6868zs0gvc59s5")
+    }
+
+    public toJSON() {
+        return [this.value, this.address.to_bech32()]
+    }
+}
+
+export interface SubmitTxRequest {
+    transaction: L2Tx,
+    signatures: Signature[],
+    bridge_outs: BridgeOut[],
+}
+
+export interface SubmitTxResponse {
+    status: string
 }
 
 // ==============================================================
