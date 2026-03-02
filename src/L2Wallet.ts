@@ -6,6 +6,7 @@ import { Backend } from './Service/Backend'
 import { SeedphraseWallet } from './SeedphraseWallet'
 import * as L2 from './Service/L2'
 import { jubjub } from '@noble/curves/misc.js'
+import { mimcConstantsRaw, mimcHash, mimcHashN, eddsaSign, eddsaVerify } from './EdDSA'
 
 export class L2Wallet extends EventTarget {
     private readonly backend: Backend;
@@ -33,18 +34,34 @@ export class L2Wallet extends EventTarget {
         const scalar = BigInt('0x' + bytesToHex(entropy))
         console.log(scalar)
 
-
-        const { secretKey, publicKey } = jubjub.keygen(entropy);
-        this.secretKey = secretKey
-        this.publicKey = publicKey
-
-        console.log(secretKey)
-        const msg = new TextEncoder().encode('hello noble');
-        const sig = jubjub.sign(msg, secretKey);
-
-        console.log(sig)
-        //this.dispatchEvent(new CustomEvent('initialized'))
         
+
+        //const { secretKey, publicKey } = jubjub.keygen(entropy);
+        //this.secretKey = secretKey
+        //this.publicKey = publicKey
+
+        //console.log(secretKey)
+        //const msg = new TextEncoder().encode('hello noble');
+        //const sig = jubjub.sign(msg, secretKey);
+
+        //console.log(sig)
+
+        const mimcConstants = mimcConstantsRaw()
+        console.log(mimcConstants)
+
+        console.log(mimcHashN(mimcConstants, 228n, [1n, 2n, 3n], 65537n))
+
+
+        const msgFE = 28365n
+        const { publicKey, signature } = eddsaSign(1283451923n, msgFE)
+        console.log(eddsaVerify(publicKey, msgFE, signature))
+
+        const { R, s } = signature 
+
+        console.log(publicKey.toAffine())
+        console.log(R.toAffine())
+        console.log(s)
+        //this.dispatchEvent(new CustomEvent('initialized'))
     }
 
     async setNetwork(): Promise<void> {
