@@ -62,6 +62,12 @@ export class L2Wallet extends EventTarget {
 
         console.log(hash)
 
+        const signatures: L2.Signature[] = [ new L2.Signature() ]
+
+        const resp = await this.l2.submitTx({ transaction: l2Tx, signatures: signatures, bridge_outs: []})
+
+        console.log(resp)
+
     }
 
     async bridgeIn(): Promise<void> {
