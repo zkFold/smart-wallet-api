@@ -3,6 +3,12 @@ import axios from 'axios';
 import { serialize, deserialize } from '../JSON';
 import { Buffer } from 'buffer';
 import JSONbig from "json-bigint";
+import { JubjubPoint, EddsaSignature, pointToAffineXY } from '../EdDSA'
+import { jubjub } from '@noble/curves/misc.js'
+
+export function bigintToJSON(num: bigint): string {
+    return `__bigint__:${num}`
+}
 
 function stringifyWithBigInt(obj: unknown): string {
   return JSON.stringify(obj).replace(/"__bigint__:(\d+)"/g, "$1");
@@ -22,7 +28,7 @@ export class FieldElement {
     }
 
     public toJSON() {
-        return `__bigint__:${this.scalar}`
+        return bigintToJSON(this.scalar) 
     }
 
 }
@@ -32,13 +38,17 @@ export class L2Address {
     private readonly fieldElement: FieldElement 
 
     public constructor(address: string) {
-        this.fieldElement = new FieldElement(address) 
+        const [header, fieldElement] = address.split("_")
+        if (header !== "l2") {
+            throw new Error(`The provided address is not of the form 'l2_<decimal digits>': ${address}`)
+        }
+        this.fieldElement = new FieldElement(fieldElement) 
     }
 
-    public static readonly empty: L2Address = new L2Address("0")
+    public static readonly empty: L2Address = new L2Address("l2_0")
 
     public toString(): string {
-        return this.fieldElement.toString()
+        return `l2_${this.fieldElement.toString()}`
     }
 
     public toJSON() {
@@ -133,8 +143,8 @@ export class L2Output {
 }
 
 export class L2UTxO {
-    private readonly uRef: L2OutputRef
-    private readonly uOutput: L2Output
+    public readonly uRef: L2OutputRef
+    public readonly uOutput: L2Output
 
     public constructor(uRef: L2OutputRef, uOutput: L2Output) {
         this.uRef = uRef
@@ -234,18 +244,41 @@ export class L2Tx {
 }
 
 export class Signature {
-    private readonly curvePoint: number
-    private readonly scalar: number
-    private readonly pubkey: number
+    private readonly signature: EddsaSignature
+    private readonly pubkey: JubjubPoint
+    private isZero: boolean
 
-    constructor() {
-        this.curvePoint = 0
-        this.scalar = 0
-        this.pubkey = 0
+    constructor(signature: EddsaSignature, pubkey: JubjubPoint) {
+        this.signature = signature
+        this.pubkey = pubkey
+        this.isZero = false
     }
 
+    public static zero(): Signature {
+        const Point = (jubjub as any).Point;
+        const gen: JubjubPoint = Point.BASE;
+        const sig = new Signature({R: gen, s: 0n}, gen)
+        sig.isZero = true
+        return sig
+    }
+
+
     public toJSON() {
-        return [this.curvePoint, [this.scalar, this.pubkey]]
+        if (this.isZero) {
+            return [{x: 0, y:0}, [0, {x:0, y:0}]]
+        }
+        const { R, s } = this.signature
+        const rAffine = pointToAffineXY(R)
+        const pubkeyAffine = pointToAffineXY(this.pubkey)
+        return [ { x: bigintToJSON(rAffine.x)
+                 , y: bigintToJSON(rAffine.y)
+                 }
+               , [ bigintToJSON(s)
+                 , { x: bigintToJSON(pubkeyAffine.x)
+                   , y: bigintToJSON(pubkeyAffine.y)
+                   }
+                 ]
+               ]
     }
 }
 
@@ -253,9 +286,9 @@ export class BridgeOut {
     private readonly value: { [key: string]: number }
     private readonly address: CSL.Address
 
-    constructor() {
-        this.value = {}
-        this.address = CSL.Address.from_bech32("addr_test1wrlu98daep56mrzjzefvsdu43q8pzjtfk3luvku6868zs0gvc59s5")
+    constructor(value: { [key: string]: number }, address: CSL.Address) {
+        this.value = value 
+        this.address = address 
     }
 
     public toJSON() {
@@ -387,7 +420,8 @@ export class L2Backend {
      */
     public async txHash(tx: TxHashRequest): Promise<TxHashResponse> {
         const { data } = await axios.post(`${this.url}/v0/tx/hash/`, stringifyWithBigInt(tx), { ...this.headers({ "Content-Type": "application/json" }), ...{ responseType: 'text' } })
-        return deserialize(data)
+        const { hash } = deserialize(data)
+        return { hash: new FieldElement(hash.toString())}
     }
 
 

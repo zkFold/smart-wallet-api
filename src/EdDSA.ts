@@ -122,9 +122,9 @@ export function mimcHash(inputs: readonly bigint[], p: bigint): bigint {
 }
 
 // ---------- EdDSA (matches ZkFold.Symbolic.Algorithm.EdDSA) ----------
-type JubjubPoint = InstanceType<(typeof jubjub)['Point']>;
+export type JubjubPoint = InstanceType<(typeof jubjub)['Point']>;
 
-function pointToAffineXY(P: JubjubPoint): { x: bigint; y: bigint } {
+export function pointToAffineXY(P: JubjubPoint): { x: bigint; y: bigint } {
   // noble-curves points typically support toAffine()
   // (if API differs in your version, adapt here)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -130,6 +130,12 @@ export abstract class AbstractGoogleWallet extends EventTarget implements CIP30W
         return await this.addressForGmail(this.userId)
     }
 
+    public async stringAddress(): Promise<string> {
+        const addr = await this.getAddress()
+        return addr.to_bech32() 
+    }
+
+
     /**
      * @async
      * Get an unused address for the wallet 

@@ -36,7 +36,8 @@ export type WalletEvent =
  */
 export enum AddressType {
     Bech32 = 0,
-    Email = 1
+    Email = 1,
+    L2 = 2
 }
 
 export interface TransactionRequest {

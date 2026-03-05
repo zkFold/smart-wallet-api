@@ -114,6 +114,11 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
         return new Promise((resolve, reject) => resolve(this.generateAddress(0)))
     }
 
+    public async stringAddress(): Promise<string> {
+        const addr = await this.getAddress()
+        return addr.to_bech32()
+    }
+
     getUserId(): string {
         return this.generateAddress(0).to_bech32()
     }
