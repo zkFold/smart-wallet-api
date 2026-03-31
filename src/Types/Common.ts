@@ -21,6 +21,8 @@ export class BigIntWrap {
         }
     }
 
+    public static readonly zero: BigIntWrap = new BigIntWrap("0")
+
     add(other: BigIntWrap): BigIntWrap {
         return new BigIntWrap(this.int + other.int)
     }
