@@ -9,7 +9,7 @@ export type Version = 'v0'
  *  data is Google JSON Web Token as a string
  *  rootKey is the private key to sign transactions (can be generated randomly)
  */
-export interface WalletInitialiser {
+export interface SmartContractWalletInitialiser {
     jwt: string
     tokenSKey?: string
 }
@@ -42,8 +42,7 @@ export enum AddressType {
 export interface TransactionRequest {
     recipient: string
     recipientType: AddressType
-    asset: string
-    amount: string
+    assets: {[asset: string] : number}
 }
 
 /**

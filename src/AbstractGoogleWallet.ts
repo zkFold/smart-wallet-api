@@ -1,27 +1,29 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
 import { Backend } from './Service/Backend'
-import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, BalanceResponse, Transaction, WalletInitialiser, PrepareTxParameters, PrepareTxResponse } from './Types'
+import { CIP30Wallet } from './CIP30Wallet'
+import { UTxO, Output, BigIntWrap, SubmitTxResult, ProofBytes, AddressType, TransactionRequest, ProofInput, SmartTxRecipient, BalanceResponse, Transaction, SmartContractWalletInitialiser, PrepareTxParameters, PrepareTxResponse } from './Types'
 import { Prover } from './Service/Prover'
 import { b64ToBn, harden, hexToBytes } from './Utils'
 import { GoogleApi } from './Service/Google'
 
-export interface WalletData {
+export interface SmartContractWalletData {
     jwt?: string
     tokenSKey?: CSL.Bip32PrivateKey
     userId?: string
     activated: boolean
     proof: ProofBytes | null
 }
-export interface WalletI {
+export interface SmartContractWalletI {
     googleApi: GoogleApi
     backend: Backend
     prover: Prover
 }
 
-export abstract class AbstractWallet extends EventTarget implements WalletI, WalletData {
+export abstract class AbstractGoogleWallet extends EventTarget implements CIP30Wallet, SmartContractWalletI, SmartContractWalletData {
     public jwt?: string
     public tokenSKey?: CSL.Bip32PrivateKey
     public userId?: string
+
     public activated: boolean = false
     public proof: ProofBytes | null = null
 
@@ -43,9 +45,9 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
 
     public abstract login(): void;
     public abstract logout(): void;
-    protected abstract saveWallet(addr: string, wallet: WalletInitialiser): void;
+    protected abstract saveWallet(addr: string, wallet: SmartContractWalletInitialiser): void;
     protected abstract saveState(state: string): void;
-    protected abstract getWallet(addr: string): Promise<WalletInitialiser | null>;
+    protected abstract getWallet(addr: string): Promise<SmartContractWalletInitialiser | null>;
     public abstract oauthCallback(callbackData: string): Promise<void>;
 
 
@@ -147,7 +149,7 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
         if (!this.userId) {
             throw new Error('Wallet is not initialised')
         }
-        const balance = await this.backend.balance(this.userId)
+        const balance = await this.backend.emailBalance(this.userId)
         return balance
     }
 
@@ -168,7 +170,7 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
         if (!this.userId) {
             throw new Error('Wallet is not initialised')
         }
-        return await this.backend.txHistory(this.userId)
+        return await this.backend.emailTxHistory(this.userId)
     }
 
     /**
@@ -253,11 +255,14 @@ export abstract class AbstractWallet extends EventTarget implements WalletI, Wal
                 throw new Error('There is no active wallet when sending transaction')
             }
 
-            console.log(`Sending ${request.amount} ${request.asset} to ${request.recipient} using ${request.recipientType}`)
+            console.log(`Sending ${request.assets} to ${request.recipient} using ${request.recipientType}`)
 
             // Create asset dictionary
             const assetDict: { [key: string]: BigIntWrap } = {}
-            assetDict[request.asset] = new BigIntWrap(request.amount)
+
+            for (let [key, value] of Object.entries(request.assets)) {
+                assetDict[key] = new BigIntWrap(value)
+            }
 
             // Create recipient
             let recipient: SmartTxRecipient
