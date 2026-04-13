@@ -300,10 +300,12 @@ export interface SubmitTxRequest {
     transaction: L2Tx,
     signatures: Signature[],
     bridge_outs: BridgeOut[],
+    input_utxos: L2UTxO[],
 }
 
 export interface SubmitTxResponse {
-    status: string
+    status: string,
+    tx_hash: string,
 }
 
 // ==============================================================
@@ -350,6 +352,24 @@ export interface SubmitL1TxResponse {
 
 // ==============================================================
 
+export interface L2TxHistoryRequest {
+    l2address: L2Address 
+}
+
+export interface TxInfo {
+    batch_id: number,
+    hash: string,
+    id: FieldElement,
+    payload: string,
+    status: string,
+    submitted_at: string,
+}
+
+export interface L2TxHistoryResponse {
+    total: number,
+    txs: TxInfo[],
+}
+
 /**
  * A wrapper for interaction with the aggregation server backend.
  * @class
@@ -388,6 +408,17 @@ export class L2Backend {
     public async health(): Promise<void> {
         await axios.get(`${this.url}/v0/health`, this.headers())
         return
+    }
+
+    /**
+     * Obtain L2 representation of an L1 address 
+     * @async
+     * @param {CSL.Address} address
+     * @returns {L2Address}
+     */
+    public async getL2Address(address: CSL.Address): Promise<L2Address> {
+        const { data } = await axios.post(`${this.url}/v0/l1/address/convert`, { address: address.to_bech32() }, this.headers())
+        return new L2Address(`l2_{data.l2_address}`)
     }
 
     /**
@@ -465,6 +496,19 @@ export class L2Backend {
     public async submitL1Tx(txRequest: SubmitL1TxRequest): Promise<SubmitL1TxResponse> {
         const witnessHex = Buffer.from(txRequest.witness.to_bytes()).toString('hex')
         const { data } = await axios.post(`${this.url}/v0/l1/tx/submit/`, { transaction: txRequest.transaction, witness: witnessHex } , this.headers())
+
+        return data 
+    }
+
+
+    /**
+     * Obtain L2 transaction history 
+     * @async
+     * @param {L2Address} address
+     * @returns {L2TxHistoryResponse}
+     */
+    public async txHistory(address: L2Address): Promise<L2TxHistoryResponse> {
+        const { data } = await axios.get(`${this.url}/v0/txs?l2address=${stringifyWithBigInt(address)}` , this.headers())
 
         return data 
     }

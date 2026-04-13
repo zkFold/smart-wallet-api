@@ -179,7 +179,7 @@ export class L2Wallet extends EventTarget {
 
         // Bridge-out
         if (request.recipientType !== AddressType.L2) {
-            l2Recipient = await this.l2.getL2Address(request.recipient)
+            l2Recipient = await this.l2.getL2Address(CSL.Address.from_bech32(request.recipient))
             bridge_outs.push(new L2.BridgeOut(request.assets, CSL.Address.from_bech32(request.recipient)))
         } else {
             l2Recipient = new L2.L2Address(request.recipient)
@@ -204,7 +204,7 @@ export class L2Wallet extends EventTarget {
         const signature = await this.signTransaction(l2Tx)
         const signatures = await this.fillSignatures([signature])
 
-        const resp = await this.l2.submitTx({ transaction: l2Tx, signatures: signatures, bridge_outs: bridge_outs})
+        const resp = await this.l2.submitTx({ transaction: l2Tx, signatures: signatures, bridge_outs: bridge_outs, input_utxos: utxos })
         console.log(resp)
     }
 
@@ -232,7 +232,32 @@ export class L2Wallet extends EventTarget {
      */
     async getTxHistory(): Promise<Transaction[]> {
         if (this.l2Mode) {
-            return new Promise((resolve, reject) => resolve([]))
+            const txs = await this.l2.txHistory(this.l2Address())
+
+            const oldTxs = txs.txs.map((tx) => {
+                return { transaction_id: tx.id.toString(), value_diff: {}, timestamp: tx.submitted_at, from_addrs: [], to_addrs: [] }
+            })
+            /**            
+            For reference:
+            
+            export interface TxInfo {
+                batch_id: number,
+                hash: string,
+                id: FieldElement,
+                payload: string,
+                status: string,
+                submitted_at: string,
+            }
+            
+            export interface Transaction {
+                transaction_id: string
+                value_diff: { [asset: string]: number }
+                timestamp: string
+                from_addrs: CSL.Address[]
+                to_addrs: CSL.Address[]
+            }
+            */
+            return oldTxs 
         }
         return await this.seedphraseWallet.getTxHistory()
     }
