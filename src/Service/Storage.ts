@@ -1,10 +1,10 @@
 import { deserialize, serialize } from '../JSON'
-import { Version, WalletInitialiser } from '../Types'
+import { Version, SmartContractWalletInitialiser } from '../Types'
 
 interface StorageI {
     version: Version
     // Activated wallets
-    wallets: { [addr: string]: WalletInitialiser }
+    wallets: { [addr: string]: SmartContractWalletInitialiser }
 }
 
 export class Storage {
@@ -13,9 +13,9 @@ export class Storage {
   /**
    * Saves the wallet initialiser for a given address to local storage.
    * @param {string} addr - The wallet address.
-   * @param {WalletInitialiser} wallet - The wallet initialiser data.
+   * @param {SmartContractWalletInitialiser} wallet - The wallet initialiser data.
    */
-  public saveWallet(addr: string, wallet: WalletInitialiser): void {
+  public saveWallet(addr: string, wallet: SmartContractWalletInitialiser): void {
     const storage = this.getStorage()
     storage.wallets[addr] = wallet
     localStorage.setItem(this.STORAGE_KEY, serialize(storage))
@@ -24,9 +24,9 @@ export class Storage {
   /**
    * Retrieves the wallet initialiser for a given address from local storage.
    * @param {string} addr - The wallet address.
-   * @returns {WalletInitialiser | null} - The wallet initialiser data or null if not found.
+   * @returns {SmartContractWalletInitialiser | null} - The wallet initialiser data or null if not found.
    */
-  public getWallet(addr: string): WalletInitialiser | null {
+  public getWallet(addr: string): SmartContractWalletInitialiser | null {
     const storage = this.getStorage()
     return storage.wallets[addr] ?? null
   }

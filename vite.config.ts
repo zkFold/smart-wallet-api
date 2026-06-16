@@ -8,7 +8,7 @@ export default defineConfig({
       insertTypesEntry: true,
       copyDtsFiles: false,
       rollupTypes: true
-    })
+    }),
   ],
   build: {
     lib: {
@@ -34,6 +34,6 @@ export default defineConfig({
     global: 'globalThis'
   },
   optimizeDeps: {
-    include: ['@scure/bip39', 'axios', 'json-bigint']
+    include: ['@scure/bip39', 'axios', 'json-bigint'],
   }
 })
