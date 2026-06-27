@@ -160,56 +160,66 @@ export class L2Wallet extends EventTarget {
             return
         }
 
-        // Bridge-in
-        if (!this.l2Mode) {
-            await this.bridgeIn(request.assets, new L2.L2Address(request.recipient))
-            return
-        }
+        this.dispatchEvent(new CustomEvent('transaction_initiated', { detail: true }))
 
-        const { inputs, outputs, assets } = await this.l2.txParameters()
-        
-        const l2Tx = new L2.L2Tx(inputs, outputs, assets)
-
-        const utxos = (await this.l2Utxos()).slice(0, inputs)
-        if (utxos.length === 0) {
-            throw new Error("No L2 UTxOs available to spend")
-        }
-        utxos.forEach((u) => l2Tx.addInput(u.uRef))
-
-        const bridge_outs: L2.BridgeOut[] = []
-
-        let l2Recipient: L2.L2Address
-        let isBridgeOut = false
-
-        // Bridge-out
-        if (request.recipientType !== AddressType.L2) {
-            l2Recipient = await this.l2.getL2Address(CSL.Address.from_bech32(request.recipient))
-            bridge_outs.push(new L2.BridgeOut(request.assets, CSL.Address.from_bech32(request.recipient)))
-            isBridgeOut = true
-        } else {
-            l2Recipient = new L2.L2Address(request.recipient)
-        }
-
-        // L2 transaction
-        
-        const output = new L2.L2Output(l2Recipient, assets)
-
-        Object.entries(request.assets).forEach(
-          ([key, value]) => {
-            if (key === 'lovelace') {
-                output.addAsset(L2.AssetValue.ada(value))
-            } else {
-                const [policy, name] = key.split(".")
-                output.addAsset(new L2.AssetValue(this.assetFieldElement(policy), this.assetFieldElement(name), value))
+        try {
+            // Bridge-in
+            if (!this.l2Mode) {
+                await this.bridgeIn(request.assets, new L2.L2Address(request.recipient))
+                this.dispatchEvent(new CustomEvent('transaction_pending', { detail: request }))
+                return
             }
-          }
-        );
-        l2Tx.addOutput(isBridgeOut ? L2.L2TxOutput.bridgeOut(output) : L2.L2TxOutput.l2Output(output))
-        
-        const signature = await this.signL2Transaction(l2Tx)
-        const signatures = await this.fillSignatures([signature])
 
-        await this.l2.submitTx({ transaction: l2Tx, signatures: signatures, bridge_outs: bridge_outs, input_utxos: utxos })
+            const { inputs, outputs, assets } = await this.l2.txParameters()
+
+            const l2Tx = new L2.L2Tx(inputs, outputs, assets)
+
+            const utxos = (await this.l2Utxos()).slice(0, inputs)
+            if (utxos.length === 0) {
+                throw new Error("No L2 UTxOs available to spend")
+            }
+            utxos.forEach((u) => l2Tx.addInput(u.uRef))
+
+            const bridge_outs: L2.BridgeOut[] = []
+
+            let l2Recipient: L2.L2Address
+            let isBridgeOut = false
+
+            // Bridge-out
+            if (request.recipientType !== AddressType.L2) {
+                l2Recipient = await this.l2.getL2Address(CSL.Address.from_bech32(request.recipient))
+                bridge_outs.push(new L2.BridgeOut(request.assets, CSL.Address.from_bech32(request.recipient)))
+                isBridgeOut = true
+            } else {
+                l2Recipient = new L2.L2Address(request.recipient)
+            }
+
+            // L2 transaction
+
+            const output = new L2.L2Output(l2Recipient, assets)
+
+            Object.entries(request.assets).forEach(
+              ([key, value]) => {
+                if (key === 'lovelace') {
+                    output.addAsset(L2.AssetValue.ada(value))
+                } else {
+                    const [policy, name] = key.split(".")
+                    output.addAsset(new L2.AssetValue(this.assetFieldElement(policy), this.assetFieldElement(name), value))
+                }
+              }
+            );
+            l2Tx.addOutput(isBridgeOut ? L2.L2TxOutput.bridgeOut(output) : L2.L2TxOutput.l2Output(output))
+
+            const signature = await this.signL2Transaction(l2Tx)
+            const signatures = await this.fillSignatures([signature])
+
+            await this.l2.submitTx({ transaction: l2Tx, signatures: signatures, bridge_outs: bridge_outs, input_utxos: utxos })
+            this.dispatchEvent(new CustomEvent('transaction_pending', { detail: request }))
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            this.dispatchEvent(new CustomEvent('transaction_failed', { detail: message }))
+            throw error
+        }
     }
 
     async getBalance(): Promise<BalanceResponse> {

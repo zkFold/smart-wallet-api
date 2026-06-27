@@ -46,10 +46,11 @@
     "vite-plugin-dts": "^4.5.4",
     "vitest": "^3.2.4"
   },
-  "export": {
+  "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/smart-wallet-api.es.js",
-      "require": "./dist/smart-wallet-api.cjs.js"
+      "default": "./dist/smart-wallet-api.es.js"
     }
   },
   "dependencies": {
