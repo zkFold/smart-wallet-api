@@ -441,6 +441,14 @@ export interface L2TxHistoryResponse {
     txs: TxInfo[],
 }
 
+export interface TxResponse {
+    record: TxInfo,
+}
+
+export interface PendingTxsResponse {
+    txs: TxInfo[],
+}
+
 export interface BridgeOutEntry {
     tx_hash: string,
     value: { [key: string]: number },
@@ -630,6 +638,30 @@ export class L2Backend {
             this.textConfig(),
         )
         return this.parseJSON<L2TxHistoryResponse>(data)
+    }
+
+    /**
+     * Obtain a submitted L2 transaction by hash.
+     * @async
+     * @param {string} hash
+     * @returns {TxResponse}
+     */
+    public async tx(hash: string): Promise<TxResponse> {
+        const { data } = await axios.get(
+            `${this.url}/v0/tx/${encodeURIComponent(hash)}`,
+            this.textConfig(),
+        )
+        return this.parseJSON<TxResponse>(data)
+    }
+
+    /**
+     * Obtain L2 transactions currently waiting for a batch.
+     * @async
+     * @returns {PendingTxsResponse}
+     */
+    public async pendingTxs(): Promise<PendingTxsResponse> {
+        const { data } = await axios.get(`${this.url}/v0/txs/pending`, this.textConfig())
+        return this.parseJSON<PendingTxsResponse>(data)
     }
 
     /**

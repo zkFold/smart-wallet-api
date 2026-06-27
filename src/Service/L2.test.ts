@@ -146,4 +146,35 @@ describe('L2Backend', () => {
             '29931946378447235425800399358983051578702798626614613666022638876278288045341',
         )
     })
+
+    it('fetches transaction status by hash', async () => {
+        mockedAxios.get.mockResolvedValueOnce({
+            data: '{"record":{"id":2,"hash":"22126512852062776111476410801963910846910955639868038706962231464082913720297","status":"batched","submitted_at":"2026-06-26T15:32:37Z","payload":{},"batch_id":2}}',
+        })
+        const backend = new L2Backend('http://rollup.example')
+
+        const response = await backend.tx('22126512852062776111476410801963910846910955639868038706962231464082913720297')
+
+        expect(mockedAxios.get).toHaveBeenCalledWith(
+            'http://rollup.example/v0/tx/22126512852062776111476410801963910846910955639868038706962231464082913720297',
+            expect.objectContaining({ responseType: 'text' }),
+        )
+        expect(response.record.status).toBe('batched')
+    })
+
+    it('fetches bridge-outs for an L1 address', async () => {
+        mockedAxios.get.mockResolvedValueOnce({
+            data: '{"entries":[{"tx_hash":"abc","value":{"lovelace":5000000},"status":"batched"}]}',
+        })
+        const backend = new L2Backend('http://rollup.example')
+        const address = { to_bech32: () => 'addr_test1...' } as any
+
+        const response = await backend.bridgeOuts(address)
+
+        expect(mockedAxios.get).toHaveBeenCalledWith(
+            'http://rollup.example/v0/bridge/out?l1address=addr_test1...',
+            expect.objectContaining({ responseType: 'text' }),
+        )
+        expect(response.entries[0].tx_hash).toBe('abc')
+    })
 })

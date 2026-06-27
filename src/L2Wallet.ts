@@ -99,7 +99,7 @@ export class L2Wallet extends EventTarget {
         }
     }
 
-    private async signTransaction(tx: L2.L2Tx): Promise<L2.Signature>  {
+    public async signL2Transaction(tx: L2.L2Tx): Promise<L2.Signature>  {
         const { hash } = await this.l2.txHash({ transaction: tx })
 
         const { publicKey, signature } = eddsaSign(this.privateKeyScalar, hash.scalar)
@@ -204,7 +204,7 @@ export class L2Wallet extends EventTarget {
         );
         l2Tx.addOutput(isBridgeOut ? L2.L2TxOutput.bridgeOut(output) : L2.L2TxOutput.l2Output(output))
         
-        const signature = await this.signTransaction(l2Tx)
+        const signature = await this.signL2Transaction(l2Tx)
         const signatures = await this.fillSignatures([signature])
 
         await this.l2.submitTx({ transaction: l2Tx, signatures: signatures, bridge_outs: bridge_outs, input_utxos: utxos })
