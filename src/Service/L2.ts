@@ -1,8 +1,7 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser';
-import axios from 'axios';
-import { serialize, deserialize } from '../JSON';
+import axios, { type AxiosRequestConfig } from 'axios';
+import { deserialize } from '../JSON';
 import { Buffer } from 'buffer';
-import JSONbig from "json-bigint";
 import { JubjubPoint, EddsaSignature, pointToAffineXY } from '../EdDSA'
 import { jubjub } from '@noble/curves/misc.js'
 
@@ -10,18 +9,31 @@ export function bigintToJSON(num: bigint): string {
     return `__bigint__:${num}`
 }
 
-function stringifyWithBigInt(obj: unknown): string {
+export function stringifyWithBigInt(obj: unknown): string {
   return JSON.stringify(obj).replace(/"__bigint__:(\d+)"/g, "$1");
 }
 
 export class FieldElement {
     public readonly scalar: bigint 
 
-    public constructor(scalar: string) {
-        this.scalar = BigInt(scalar)
+    public constructor(scalar: string | number | bigint) {
+        const normalized = typeof scalar === "string" && scalar.startsWith("__bigint__:")
+            ? scalar.slice("__bigint__:".length)
+            : scalar
+        this.scalar = BigInt(normalized)
     }
 
     public static readonly zero: FieldElement = new FieldElement("0")
+
+    public static fromJSON(value: unknown): FieldElement {
+        if (value instanceof FieldElement) {
+            return value
+        }
+        if (typeof value === "string" || typeof value === "number" || typeof value === "bigint") {
+            return new FieldElement(value)
+        }
+        throw new Error(`Invalid field element: ${String(value)}`)
+    }
 
     public toString(): string {
         return this.scalar.toString()
@@ -47,6 +59,22 @@ export class L2Address {
 
     public static readonly empty: L2Address = new L2Address("l2_0")
 
+    public static fromFieldElement(fieldElement: FieldElement): L2Address {
+        return new L2Address(`l2_${fieldElement.toString()}`)
+    }
+
+    public static fromJSON(value: unknown): L2Address {
+        return L2Address.fromFieldElement(FieldElement.fromJSON(value))
+    }
+
+    public toFieldElement(): FieldElement {
+        return this.fieldElement
+    }
+
+    public toDecimalString(): string {
+        return this.fieldElement.toString()
+    }
+
     public toString(): string {
         return `l2_${this.fieldElement.toString()}`
     }
@@ -68,6 +96,10 @@ export class L2OutputRef {
     }
 
     public static readonly empty: L2OutputRef = new L2OutputRef(FieldElement.zero, 0)
+
+    public static fromJSON(value: any): L2OutputRef {
+        return new L2OutputRef(FieldElement.fromJSON(value.orTxId), Number(value.orIndex))
+    }
 
     public toJSON() {
         return {
@@ -94,6 +126,26 @@ export class AssetValue {
         return new AssetValue(FieldElement.zero, FieldElement.zero, quantity)
     }
 
+    public static fromJSON(value: any): AssetValue {
+        return new AssetValue(
+            FieldElement.fromJSON(value.assetPolicy),
+            FieldElement.fromJSON(value.assetName),
+            Number(value.assetQuantity),
+        )
+    }
+
+    public get policy(): FieldElement {
+        return this.assetPolicy
+    }
+
+    public get name(): FieldElement {
+        return this.assetName
+    }
+
+    public get quantity(): number {
+        return this.assetQuantity
+    }
+
     public toJSON() {
         return {
             assetPolicy: this.assetPolicy,
@@ -117,6 +169,21 @@ export class L2Output {
 
     public static empty(numAssets: number): L2Output {
         return new L2Output(L2Address.empty, numAssets)
+    }
+
+    public static fromJSON(value: any): L2Output {
+        const assets = (value.oAssets ?? []).map((asset: any) => AssetValue.fromJSON(asset))
+        const output = new L2Output(L2Address.fromJSON(value.oAddress), assets.length)
+        assets.forEach((asset: AssetValue) => output.addAsset(asset))
+        return output
+    }
+
+    public get address(): L2Address {
+        return this.oAddress
+    }
+
+    public get assets(): AssetValue[] {
+        return [...this.oAssets]
     }
 
     public addAsset(asset: AssetValue): void {
@@ -153,6 +220,10 @@ export class L2UTxO {
 
     public static empty(numAssets: number): L2UTxO {
         return new L2UTxO(L2OutputRef.empty, L2Output.empty(numAssets))
+    }
+
+    public static fromJSON(value: any): L2UTxO {
+        return new L2UTxO(L2OutputRef.fromJSON(value.uRef), L2Output.fromJSON(value.uOutput))
     }
 
     public toJSON() {
@@ -206,14 +277,14 @@ export class L2Tx {
     }
 
     public addInput(input: L2OutputRef): void {
-        if (this.inputs.length > this.numInputs) {
+        if (this.inputs.length >= this.numInputs) {
             throw new Error("Attempted to add more inputs than the Transaction supports")
         }
         this.inputs.push(input)
     }
 
     public addOutput(output: L2TxOutput): void {
-        if (this.outputs.length > this.numOutputs) {
+        if (this.outputs.length >= this.numOutputs) {
             throw new Error("Attempted to add more outputs than the Transaction supports")
         }
         this.outputs.push(output)
@@ -265,18 +336,18 @@ export class Signature {
 
     public toJSON() {
         if (this.isZero) {
-            return [{x: 0, y:0}, [0, {x:0, y:0}]]
+            return [{x: 0, y: 0}, [{x: 0, y: 0}, 0]]
         }
         const { R, s } = this.signature
         const rAffine = pointToAffineXY(R)
         const pubkeyAffine = pointToAffineXY(this.pubkey)
-        return [ { x: bigintToJSON(rAffine.x)
-                 , y: bigintToJSON(rAffine.y)
+        return [ { x: bigintToJSON(pubkeyAffine.x)
+                 , y: bigintToJSON(pubkeyAffine.y)
                  }
-               , [ bigintToJSON(s)
-                 , { x: bigintToJSON(pubkeyAffine.x)
-                   , y: bigintToJSON(pubkeyAffine.y)
+               , [ { x: bigintToJSON(rAffine.x)
+                   , y: bigintToJSON(rAffine.y)
                    }
+                 , bigintToJSON(s)
                  ]
                ]
     }
@@ -357,10 +428,10 @@ export interface L2TxHistoryRequest {
 }
 
 export interface TxInfo {
-    batch_id: number,
+    batch_id?: number | null,
     hash: string,
-    id: FieldElement,
-    payload: string,
+    id: number,
+    payload: unknown,
     status: string,
     submitted_at: string,
 }
@@ -368,6 +439,16 @@ export interface TxInfo {
 export interface L2TxHistoryResponse {
     total: number,
     txs: TxInfo[],
+}
+
+export interface BridgeOutEntry {
+    tx_hash: string,
+    value: { [key: string]: number },
+    status: string,
+}
+
+export interface BridgeOutsResponse {
+    entries: BridgeOutEntry[],
 }
 
 /**
@@ -384,21 +465,31 @@ export class L2Backend {
      * @param {string} secret  - optional Backend's secret (API key)
      */
     constructor(url: string, secret: string | null = null) {
-        this.url = url
+        this.url = url.replace(/\/+$/, "")
         this.secret = secret
     }
 
-    private headers(additional: Record<string, string> = {}) {
-        if (Object.keys(additional).length === 0 && !this.secret) {
-            return {}
-        }
-        const headers: Record<string, any> = {
-            headers: additional
-        }
+    private headers(additional: Record<string, string> = {}): AxiosRequestConfig {
+        const headers: Record<string, string> = { ...additional }
         if (this.secret) {
-            headers.headers['api-key'] = this.secret
+            headers['api-key'] = this.secret
         }
-        return headers
+        return Object.keys(headers).length === 0 ? {} : { headers }
+    }
+
+    private textConfig(additional: Record<string, string> = {}): AxiosRequestConfig {
+        return { ...this.headers(additional), responseType: "text" }
+    }
+
+    private parseJSON<T>(data: unknown): T {
+        if (typeof data !== "string") {
+            return data as T
+        }
+        const parsed = deserialize(data)
+        if (parsed === null) {
+            throw new Error("Failed to parse aggregator JSON response")
+        }
+        return parsed as T
     }
 
     /**
@@ -417,8 +508,13 @@ export class L2Backend {
      * @returns {L2Address}
      */
     public async getL2Address(address: CSL.Address): Promise<L2Address> {
-        const { data } = await axios.post(`${this.url}/v0/l1/address/convert`, { address: address.to_bech32() }, this.headers())
-        return new L2Address(`l2_{data.l2_address}`)
+        const { data } = await axios.post(
+            `${this.url}/v0/l1/address/convert`,
+            { address: address.to_bech32() },
+            this.textConfig({ "Content-Type": "application/json" }),
+        )
+        const response = this.parseJSON<{ l2_address: unknown }>(data)
+        return L2Address.fromJSON(response.l2_address)
     }
 
     /**
@@ -428,8 +524,12 @@ export class L2Backend {
      * @returns {L2UTxO[]}
      */
     public async utxos(address: L2Address): Promise<L2UTxO[]> {
-        const { data } = await axios.get(`${this.url}/v0/utxos?address=${address.toString()}`, this.headers())
-        return data.qlurUtxos
+        const { data } = await axios.get(
+            `${this.url}/v0/utxos?address=${encodeURIComponent(address.toDecimalString())}`,
+            this.textConfig(),
+        )
+        const response = this.parseJSON<{ utxos: unknown[] }>(data)
+        return response.utxos.map((utxo) => L2UTxO.fromJSON(utxo))
     }
 
     /**
@@ -438,9 +538,13 @@ export class L2Backend {
      * @returns {TxParametersResponse}
      */
     public async txParameters(): Promise<TxParametersResponse> {
-        const { data } = await axios.get(`${this.url}/v0/tx/parameters/`, this.headers())
-
-        return data
+        const { data } = await axios.get(`${this.url}/v0/tx/parameters`, this.textConfig())
+        const response = this.parseJSON<{ inputs: number, outputs?: number, assets: number }>(data)
+        return {
+            inputs: Number(response.inputs),
+            outputs: Number(response.outputs ?? response.inputs),
+            assets: Number(response.assets),
+        }
     }
 
     /**
@@ -450,9 +554,13 @@ export class L2Backend {
      * @returns {TxHashResponse}
      */
     public async txHash(tx: TxHashRequest): Promise<TxHashResponse> {
-        const { data } = await axios.post(`${this.url}/v0/tx/hash/`, stringifyWithBigInt(tx), { ...this.headers({ "Content-Type": "application/json" }), ...{ responseType: 'text' } })
-        const { hash } = deserialize(data)
-        return { hash: new FieldElement(hash.toString())}
+        const { data } = await axios.post(
+            `${this.url}/v0/tx/hash`,
+            stringifyWithBigInt(tx),
+            this.textConfig({ "Content-Type": "application/json" }),
+        )
+        const response = this.parseJSON<{ hash: unknown }>(data)
+        return { hash: FieldElement.fromJSON(response.hash) }
     }
 
 
@@ -463,9 +571,12 @@ export class L2Backend {
      * @returns {SubmitTxResponse}
      */
     public async submitTx(txRequest: SubmitTxRequest): Promise<SubmitTxResponse> {
-        const { data } = await axios.post(`${this.url}/v0/tx/`, stringifyWithBigInt(txRequest), this.headers({ "Content-Type": "application/json" }))
-
-        return data
+        const { data } = await axios.post(
+            `${this.url}/v0/tx`,
+            stringifyWithBigInt(txRequest),
+            this.textConfig({ "Content-Type": "application/json" }),
+        )
+        return this.parseJSON<SubmitTxResponse>(data)
     }
 
     /**
@@ -481,9 +592,12 @@ export class L2Backend {
             used_addresses: bridgeInRequest.used_addresses.map((x) => x.to_bech32()),
             change_address: bridgeInRequest.change_address.to_bech32(),
         }
-        const { data } = await axios.post(`${this.url}/v0/bridge/in/`, stringifyWithBigInt(req), this.headers({ "Content-Type": "application/json" }))
-
-        return data 
+        const { data } = await axios.post(
+            `${this.url}/v0/bridge/in`,
+            stringifyWithBigInt(req),
+            this.textConfig({ "Content-Type": "application/json" }),
+        )
+        return this.parseJSON<BridgeInResponse>(data)
     }
 
 
@@ -495,9 +609,12 @@ export class L2Backend {
      */
     public async submitL1Tx(txRequest: SubmitL1TxRequest): Promise<SubmitL1TxResponse> {
         const witnessHex = Buffer.from(txRequest.witness.to_bytes()).toString('hex')
-        const { data } = await axios.post(`${this.url}/v0/l1/tx/submit/`, { transaction: txRequest.transaction, witness: witnessHex } , this.headers())
-
-        return data 
+        const { data } = await axios.post(
+            `${this.url}/v0/l1/tx/submit`,
+            { transaction: txRequest.transaction, witness: witnessHex },
+            this.textConfig({ "Content-Type": "application/json" }),
+        )
+        return this.parseJSON<SubmitL1TxResponse>(data)
     }
 
 
@@ -508,9 +625,25 @@ export class L2Backend {
      * @returns {L2TxHistoryResponse}
      */
     public async txHistory(address: L2Address): Promise<L2TxHistoryResponse> {
-        const { data } = await axios.get(`${this.url}/v0/txs?l2address=${stringifyWithBigInt(address)}` , this.headers())
+        const { data } = await axios.get(
+            `${this.url}/v0/txs?l2address=${encodeURIComponent(address.toDecimalString())}`,
+            this.textConfig(),
+        )
+        return this.parseJSON<L2TxHistoryResponse>(data)
+    }
 
-        return data 
+    /**
+     * Obtain bridge-out entries delivered to an L1 address.
+     * @async
+     * @param {CSL.Address} address
+     * @returns {BridgeOutsResponse}
+     */
+    public async bridgeOuts(address: CSL.Address): Promise<BridgeOutsResponse> {
+        const { data } = await axios.get(
+            `${this.url}/v0/bridge/out?l1address=${encodeURIComponent(address.to_bech32())}`,
+            this.textConfig(),
+        )
+        return this.parseJSON<BridgeOutsResponse>(data)
     }
 
 }

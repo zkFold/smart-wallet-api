@@ -48,7 +48,7 @@ export function mimcConstantsRaw(): bigint[] {
   let cur = seed;
   for (let i = 0; i < 218; i++) {
     cs.push(leBytesToBigInt(cur));
-    cur = sha256(cur); // next = SHA256(prev)
+    cur = new Uint8Array(sha256(cur)); // next = SHA256(prev)
   }
   return [0n, ...cs, 0n]; // total 220
 }
