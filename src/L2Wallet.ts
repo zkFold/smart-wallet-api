@@ -7,12 +7,12 @@ import { SeedphraseWallet } from './SeedphraseWallet'
 import * as L2 from './Service/L2'
 import { jubjub } from '@noble/curves/misc.js'
 import { 
-    mimcHash, 
     eddsaSign, 
     eddsaVerify, 
     JubjubPoint, 
     pointToAffineXY 
 } from './EdDSA'
+import { poseidonHash } from './Poseidon'
 import { 
     AddressType, 
     BalanceResponse, 
@@ -55,7 +55,7 @@ export class L2Wallet extends EventTarget {
 
         const N = jubjub.Point.CURVE().n;
 
-        this.privateKeyScalar = scalar % N
+        this.privateKeyScalar = scalar % N || 1n
         this.dispatchEvent(new CustomEvent('initialized'))
     }
 
@@ -72,13 +72,12 @@ export class L2Wallet extends EventTarget {
     }
 
     public l2Address(): L2.L2Address {
-        const P = jubjub.Point.CURVE().p;
         const Point = (jubjub as any).Point;
         const G: JubjubPoint = Point.BASE;
 
         const publicKey: JubjubPoint = G.multiply(this.privateKeyScalar);
         const {x, y} = pointToAffineXY(publicKey)
-        const hash = mimcHash([x, y], P)
+        const hash = poseidonHash([x, y])
 
         return new L2.L2Address(`l2_${hash}`)
     }
@@ -111,9 +110,12 @@ export class L2Wallet extends EventTarget {
     }
 
     private async fillSignatures(sigs: L2.Signature[]): Promise<L2.Signature[]> {
+        if (sigs.length === 0) {
+            throw new Error("Cannot pad an empty L2 signature set")
+        }
         const { inputs } = await this.l2.txParameters()
         while (sigs.length < inputs) {
-            sigs.push(L2.Signature.zero())
+            sigs.push(sigs[0])
         }
         return sigs
     }

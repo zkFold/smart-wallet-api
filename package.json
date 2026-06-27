@@ -14,7 +14,7 @@
     "build": "vite build",
     "dev": "vite",
     "preview": "vite preview",
-    "demo:l2": "tsx scripts/l2-demo.ts",
+    "demo:l2": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/l2-demo.ts",
     "test": "vitest"
   },
   "repository": {

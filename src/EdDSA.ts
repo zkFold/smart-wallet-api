@@ -1,13 +1,15 @@
-// Implements MiMC + EdDSA over Jubjub to match zkFold/symbolic Haskell code.
+// Implements EdDSA over Jubjub to match zkFold/symbolic Haskell code.
 //
 // Haskell references:
 // - MiMC constants: ZkFold.Algorithm.Hash.MiMC.Constants (seed=42 LE, iterate SHA256, take 218, wrap 0..0)
 // - MiMC Feistel:   ZkFold.Algorithm.Hash.MiMC (mimcHash2 exponent 5, constants applied in reverse order)
+// - Ledger hashFn:  ZkFold.Symbolic.Ledger.Types.Hash (Poseidon.hash)
 // - EdDSA:          ZkFold.Symbolic.Algorithm.EdDSA (eddsaSign / eddsaVerify, scalarFieldFromFE)
 //
 
 import { sha256 } from '@noble/hashes/sha2.js';
 import { jubjub } from '@noble/curves/misc.js';
+import { poseidonHash } from './Poseidon';
 
 // ---------- small bigint helpers ----------
 function mod(a: bigint, m: bigint): bigint {
@@ -153,13 +155,13 @@ export function hashForEddsa(
 ): bigint {
   const r = pointToAffineXY(rPoint);
   const a = pointToAffineXY(publicKey);
-  return mimcHash([r.x, r.y, a.x, a.y, mod(messageFE, baseFieldModulus)], baseFieldModulus);
+  return poseidonHash([r.x, r.y, a.x, a.y, mod(messageFE, baseFieldModulus)]);
 }
 
 /**
  * Deterministic nonce r per Haskell:
  *   r = scalarFieldFromFE ( hashFn (hashFn privKey :*: message) )
- * Where hashFn privKey is MiMC applied to the arithmetized privKey.
+ * Where hashFn privKey is Poseidon applied to the arithmetized privKey.
  *
  * For interoperability with a typical backend that treats privKey as a scalar integer,
  * we hash privKey as a single base-field element equal to privKey (embedded into base field).
@@ -170,8 +172,8 @@ export function nonceR(
   baseFieldModulus: bigint,
   scalarFieldOrder: bigint
 ): bigint {
-  const hPriv = mimcHash([mod(privKeyScalar, baseFieldModulus)], baseFieldModulus);
-  const h = mimcHash([hPriv, mod(messageFE, baseFieldModulus)], baseFieldModulus);
+  const hPriv = poseidonHash([mod(privKeyScalar, baseFieldModulus)]);
+  const h = poseidonHash([hPriv, mod(messageFE, baseFieldModulus)]);
   return scalarFieldFromFE(h, scalarFieldOrder);
 }
 

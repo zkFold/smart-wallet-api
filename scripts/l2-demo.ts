@@ -58,7 +58,7 @@ function adaOutput(address: L2Address, amount: number, assetSlots: number): L2Ou
 function paddedSignatures(signature: Signature, inputSlots: number): Signature[] {
     const signatures = [signature]
     while (signatures.length < inputSlots) {
-        signatures.push(Signature.zero())
+        signatures.push(signature)
     }
     return signatures
 }
