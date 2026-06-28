@@ -16,9 +16,21 @@ import { poseidonHash } from './Poseidon'
 import { 
     AddressType, 
     BalanceResponse, 
+    SubmitTxResult,
     Transaction, 
     TransactionRequest, 
 } from './Types'
+
+export type WalletSubmitKind = 'l1-send' | 'bridge-in' | 'l2-send' | 'bridge-out'
+
+export interface WalletSubmitResult {
+    layer: 'l1' | 'l2'
+    kind: WalletSubmitKind
+    status: 'submitted' | 'queued'
+    tx_id?: string
+    tx_hash?: string
+    request: TransactionRequest
+}
 
 export class L2Wallet extends EventTarget {
     private readonly backend: Backend;
@@ -153,11 +165,17 @@ export class L2Wallet extends EventTarget {
     }
 
 
-    public async sendTransaction(request: TransactionRequest): Promise<void> {
+    public async sendTransaction(request: TransactionRequest): Promise<WalletSubmitResult> {
         // Regular tx
         if (!this.l2Mode && request.recipientType !== AddressType.L2) {
-            await this.seedphraseWallet.sendTransaction(request)
-            return
+            const result: SubmitTxResult = await this.seedphraseWallet.sendTransaction(request)
+            return {
+                layer: 'l1',
+                kind: 'l1-send',
+                status: 'submitted',
+                tx_id: result.transaction_id,
+                request,
+            }
         }
 
         this.dispatchEvent(new CustomEvent('transaction_initiated', { detail: true }))
@@ -165,9 +183,15 @@ export class L2Wallet extends EventTarget {
         try {
             // Bridge-in
             if (!this.l2Mode) {
-                await this.bridgeIn(request.assets, new L2.L2Address(request.recipient))
+                const result = await this.bridgeIn(request.assets, new L2.L2Address(request.recipient))
                 this.dispatchEvent(new CustomEvent('transaction_pending', { detail: request }))
-                return
+                return {
+                    layer: 'l1',
+                    kind: 'bridge-in',
+                    status: 'submitted',
+                    tx_id: result.tx_id,
+                    request,
+                }
             }
 
             const { inputs, outputs, assets } = await this.l2.txParameters()
@@ -213,8 +237,15 @@ export class L2Wallet extends EventTarget {
             const signature = await this.signL2Transaction(l2Tx)
             const signatures = await this.fillSignatures([signature])
 
-            await this.l2.submitTx({ transaction: l2Tx, signatures: signatures, bridge_outs: bridge_outs, input_utxos: utxos })
+            const result = await this.l2.submitTx({ transaction: l2Tx, signatures: signatures, bridge_outs: bridge_outs, input_utxos: utxos })
             this.dispatchEvent(new CustomEvent('transaction_pending', { detail: request }))
+            return {
+                layer: 'l2',
+                kind: isBridgeOut ? 'bridge-out' : 'l2-send',
+                status: 'queued',
+                tx_hash: result.tx_hash,
+                request,
+            }
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
             this.dispatchEvent(new CustomEvent('transaction_failed', { detail: message }))

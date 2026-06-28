@@ -1,5 +1,5 @@
 import * as CSL from '@emurgo/cardano-serialization-lib-browser'
-import { UTxO, TransactionRequest, BalanceResponse, Transaction } from './Types'
+import { UTxO, TransactionRequest, BalanceResponse, Transaction, SubmitTxResult } from './Types'
 
 export interface CIP30Wallet {
 
@@ -74,5 +74,5 @@ export interface CIP30Wallet {
      *
      * @param {TransactionRequest} request - Transaction request object
      */
-    sendTransaction(request: TransactionRequest): Promise<void>;
+    sendTransaction(request: TransactionRequest): Promise<SubmitTxResult | void>;
 }

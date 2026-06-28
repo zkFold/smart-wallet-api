@@ -6,6 +6,7 @@ import {
     BalanceResponse, 
     BigIntWrap,
     SmartTxRecipient, 
+    SubmitTxResult,
     Transaction, 
     TransactionRequest, 
     UTxO, 
@@ -276,7 +277,7 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
      *
      * @param {TransactionRequest} request - Transaction request object
      */
-    async sendTransaction(request: TransactionRequest): Promise<void> {
+    async sendTransaction(request: TransactionRequest): Promise<SubmitTxResult> {
         this.dispatchEvent(new CustomEvent('transaction_initiated', { detail: true }))
         console.log(`Sending ${request.assets} to ${request.recipient} using ${request.recipientType}`)
 
@@ -366,6 +367,7 @@ export class SeedphraseWallet extends EventTarget implements CIP30Wallet {
 
 
         this.awaitTxConfirmed(txId, recipientAddress.to_bech32())
+        return txResponse
     }        
 
     protected async awaitTxConfirmed(txId: string, recipient: string): Promise<void> {
